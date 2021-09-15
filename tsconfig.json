@@ -1,5 +1,5 @@
 {
-  "exclude": ["template/**/*.js"],
+  "exclude": ["dist"],
   "include": ["src", "features"],
   "ts-node": {
     "files": true,
@@ -9,10 +9,7 @@
   },
   "compilerOptions": {
     "baseUrl": "./",
-    "paths": {
-      "@services/*": ["./src/services/*"],
-      "@/*": ["./src/*"]
-    },
+    "outDir": "./dist",
     /* Basic Options */
     "target": "es2019" /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017','ES2018' or 'ESNEXT'. */,
     "module": "commonjs" /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', or 'ESNext'. */,
@@ -54,7 +51,7 @@
     // "paths": {},                           /* A series of entries which re-map imports to lookup locations relative to the 'baseUrl'. */
     // "rootDirs": [],                        /* List of root folders whose combined content represents the structure of the project at runtime. */
     // "typeRoots": [],                       /* List of folders to include type definitions from. */
-    "types": ["reflect-metadata"] /* Type declaration files to be included in compilation. */,
+    "types": [] /* Type declaration files to be included in compilation. */,
     "allowSyntheticDefaultImports": true /* Allow default imports from modules with no default export. This does not affect code emit, just typechecking. */,
     "resolveJsonModule": true,
     "esModuleInterop": true /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */,
