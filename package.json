@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "publish-": "npm run clean && npm run build && cp ./package.json ./dist/package.json && cp ./Readme.md ./dist/Readme.md && cd dist && npm publish",
+    "publish-": "npm run clean && npm run build && cp package.json dist/package.json && cp Readme.md dist/Readme.md && cd dist && npm publish && npm run clean",
     "clean": "rm -rf ./dist",
     "installType": "typesync"
   },
