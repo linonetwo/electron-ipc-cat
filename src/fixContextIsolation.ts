@@ -9,8 +9,15 @@
  * This file is "unsafe" and will full of type warnings, which is necessary
  */
 import { Observable } from 'rxjs';
-import { ProxyDescriptor, ProxyPropertyType } from './common';
+import { IServicesWithOnlyObservables, IServicesWithoutObservables, ProxyDescriptor, ProxyPropertyType } from './common';
 import { getSubscriptionKey } from './utils';
+
+declare global {
+  interface Window {
+    observables: IServicesWithOnlyObservables<any>;
+    service: IServicesWithoutObservables<any>;
+  }
+}
 
 /**
  * Create `window.observables.xxx` from `window.service.xxx`
@@ -30,7 +37,7 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
         service[getSubscriptionKey(key)]((value: any) => observer.next(value));
       }) as T[keyof T];
       // store newly created Observable to `window.observables.xxx.yyy`
-      if (window.observables[name] === undefined) {
+      if (window.observables[name as string] === undefined) {
         (window.observables as any)[name] = {
           [key]: subscribedObservable,
         };
@@ -45,7 +52,7 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
           service[getSubscriptionKey(key)](...arguments_)((value: any) => observer.next(value));
         }) as T[keyof T];
       // store newly created Observable to `window.observables.xxx.yyy`
-      if (window.observables[name] === undefined) {
+      if (window.observables[name as string] === undefined) {
         (window.observables as any)[name] = {
           [key]: subscribingObservable,
         };
@@ -64,7 +71,7 @@ export function fixContextIsolation(): void {
 
   for (const key in services) {
     const serviceName = key as Exclude<keyof typeof window.service, 'descriptors'>;
-    ipcProxyFixContextIsolation(serviceName, services[serviceName], descriptors[serviceName]);
+    ipcProxyFixContextIsolation(serviceName, services[serviceName as string], descriptors[serviceName as number]);
   }
 }
 fixContextIsolation();
