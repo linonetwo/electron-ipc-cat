@@ -2,13 +2,11 @@
 
 > Based on [frankwallis/electron-ipc-proxy](https://github.com/frankwallis/electron-ipc-proxy/pull/2), and used in [TiddlyGit-Desktop](https://github.com/tiddly-gittly/TiddlyGit-Desktop).
 
-<div style="display: flex; flex-direction: column; align-items: center;">
-
-![docs/image/title-image.png](docs/image/title-image.png)
-
-Passing object and type between Electron main process and renderer process simply via preload script.
-
-</div>
+<p align="center" style="color: #343a40">
+  <img src="docs/image/title-image.png" alt="electron-ipc-cat logo">
+  <h1 align="center">electron-ipc-cat</h1>
+</p>
+<p align="center" style="font-size: 1.2rem;">Passing object and type between Electron main process and renderer process simply via preload script.</p>
 
 ## Overview
 
