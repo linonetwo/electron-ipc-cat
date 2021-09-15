@@ -1,20 +1,19 @@
 {
   "name": "electron-ipc-cat",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "publish": "npm run clean && npm run build && cp package.json dist/package.json && cd dist && npm publish",
+    "clean": "rm -rf ./dist",
     "installType": "typesync"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/linonetwo/electron-ipc-cat.git"
   },
-  "files": [
-    "dist"
-  ],
   "keywords": [
     "electron",
     "ipc",

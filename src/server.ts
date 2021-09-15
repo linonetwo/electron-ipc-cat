@@ -14,12 +14,20 @@ import {
   ProxyPropertyType,
   ApplySubscribeRequest,
 } from './common';
-import { logger } from '@services/libs/log';
 
 // TODO: make it to be able to use @decorator, instead of write a description json. We can defer the setup of ipc handler to make this possible.
 const registrations: { [channel: string]: ProxyServerHandler | null } = {};
 
-export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transport: IpcMain = ipcMain): VoidFunction {
+const exampleLogger = Object.assign(console, {
+  emerg: console.error.bind(console),
+  alert: console.error.bind(console),
+  crit: console.error.bind(console),
+  warning: console.warn.bind(console),
+  notice: console.log.bind(console),
+  debug: console.log.bind(console),
+});
+
+export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transport: IpcMain = ipcMain, logger?: typeof exampleLogger): VoidFunction {
   const { channel } = descriptor;
 
   if (registrations[channel] !== null && registrations[channel] !== undefined) {
@@ -53,7 +61,7 @@ export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transpo
           } catch {
             stringifiedRequest = request.type;
           }
-          logger.error(`E-0 IPC Error on ${channel} ${stringifiedRequest} ${(error as Error).message} ${(error as Error).stack ?? ''}`);
+          logger?.error?.(`E-0 IPC Error on ${channel} ${stringifiedRequest} ${(error as Error).message} ${(error as Error).stack ?? ''}`);
           sender.send(correlationId, { type: ResponseType.Error, error: Errio.stringify(error) });
           sender.removeListener('destroyed', nullify);
         }
@@ -67,11 +75,11 @@ function unregisterProxy(channel: string, transport: IpcMain): void {
   transport.removeAllListeners(channel);
   const server = registrations[channel];
 
-  if (server == undefined) {
+  if (server === undefined) {
     throw new IpcProxyError(`No proxy is registered on channel ${channel}`);
   }
 
-  server.unsubscribeAll();
+  server?.unsubscribeAll?.();
   delete registrations[channel];
 }
 

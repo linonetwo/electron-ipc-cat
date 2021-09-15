@@ -18,10 +18,9 @@ export type AsyncifyProxy<
   AsyncKey extends Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey> = Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey>,
 > = {
   [P in AsyncKey]: Asyncify<OriginalProxy[P]>;
-} &
-  {
-    [Q in ObservableKey]: OriginalProxy[Q];
-  };
+} & {
+  [Q in ObservableKey]: OriginalProxy[Q];
+};
 
 /** Extract observable keys from services */
 export type IServicesWithOnlyObservables<Services extends Record<string, Record<string, any>>> = {
