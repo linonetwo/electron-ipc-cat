@@ -12,22 +12,20 @@ import { Observable } from 'rxjs';
 import { IServicesWithOnlyObservables, IServicesWithoutObservables, ProxyDescriptor, ProxyPropertyType } from './common';
 import { getSubscriptionKey } from './utils';
 
-declare global {
-  interface Window {
-    observables: IServicesWithOnlyObservables<any>;
-    service: IServicesWithoutObservables<any>;
-  }
+interface IWindow {
+  observables: IServicesWithOnlyObservables<any>;
+  service: IServicesWithoutObservables<any>;
 }
 
 /**
- * Create `window.observables.xxx` from `window.service.xxx`
+ * Create `(window as IWindow).observables.xxx` from `(window as IWindow).service.xxx`
  * @param name service name
  * @param service service client proxy created in preload script
  * @param descriptor electron ipc proxy descriptor
  */
-export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name: keyof typeof window.service, service: T, descriptor: ProxyDescriptor): void {
-  if (window.observables === undefined) {
-    window.observables = {} as typeof window.observables;
+export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name: keyof IWindow['service'], service: T, descriptor: ProxyDescriptor): void {
+  if ((window as unknown as IWindow).observables === undefined) {
+    (window as unknown as IWindow).observables = {} as IWindow['observables'];
   }
 
   for (const key in descriptor.properties) {
@@ -36,13 +34,13 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
       const subscribedObservable = new Observable((observer) => {
         service[getSubscriptionKey(key)]((value: any) => observer.next(value));
       }) as T[keyof T];
-      // store newly created Observable to `window.observables.xxx.yyy`
-      if (window.observables[name as string] === undefined) {
-        (window.observables as any)[name] = {
+      // store newly created Observable to `(window as IWindow).observables.xxx.yyy`
+      if ((window as unknown as IWindow).observables[name as string] === undefined) {
+        ((window as unknown as IWindow).observables as any)[name] = {
           [key]: subscribedObservable,
         };
       } else {
-        (window.observables as any)[name][key] = subscribedObservable;
+        ((window as unknown as IWindow).observables as any)[name][key] = subscribedObservable;
       }
     }
     // create (id: string) => Observable
@@ -51,26 +49,26 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
         new Observable((observer) => {
           service[getSubscriptionKey(key)](...arguments_)((value: any) => observer.next(value));
         }) as T[keyof T];
-      // store newly created Observable to `window.observables.xxx.yyy`
-      if (window.observables[name as string] === undefined) {
-        (window.observables as any)[name] = {
+      // store newly created Observable to `(window as IWindow).observables.xxx.yyy`
+      if ((window as unknown as IWindow).observables[name as string] === undefined) {
+        ((window as unknown as IWindow).observables as any)[name] = {
           [key]: subscribingObservable,
         };
       } else {
-        (window.observables as any)[name][key] = subscribingObservable;
+        ((window as unknown as IWindow).observables as any)[name][key] = subscribingObservable;
       }
     }
   }
 }
 
 /**
- * Process `window.service`, reconstruct Observables into `window.observables`
+ * Process `(window as IWindow).service`, reconstruct Observables into `(window as IWindow).observables`
  */
 export function fixContextIsolation(): void {
-  const { descriptors, ...services } = window.service;
+  const { descriptors, ...services } = (window as unknown as IWindow).service;
 
   for (const key in services) {
-    const serviceName = key as Exclude<keyof typeof window.service, 'descriptors'>;
+    const serviceName = key as Exclude<keyof IWindow['service'], 'descriptors'>;
     ipcProxyFixContextIsolation(serviceName, services[serviceName as string], descriptors[serviceName as number]);
   }
 }

@@ -23,10 +23,10 @@ export type AsyncifyProxy<
 };
 
 /** Extract observable keys from services */
-export type IServicesWithOnlyObservables<Services extends Record<string, Record<string, any>>> = {
+export type IServicesWithOnlyObservables<Services> = {
   [P in keyof Services]: ProxyWithOnlyObservable<Services[P]>;
 };
-export type IServicesWithoutObservables<Services extends Record<string, Record<string, any>>> = {
+export type IServicesWithoutObservables<Services> = {
   [P in keyof Services]: ProxyWithOutObservable<Services[P]>;
 };
 

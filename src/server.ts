@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Observable, Subscription, isObservable } from 'rxjs';
 import { ipcMain, IpcMain, WebContents, IpcMainEvent } from 'electron';
 import Errio from 'errio';
@@ -80,13 +85,14 @@ function unregisterProxy(channel: string, transport: IpcMain): void {
   }
 
   server?.unsubscribeAll?.();
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
   delete registrations[channel];
 }
 
 class ProxyServerHandler {
   constructor(private readonly target: any) {}
 
-  private subscriptions: { [subscriptionId: string]: Subscription } = {};
+  private subscriptions: { [subscriptionId: string]: Subscription | undefined } = {};
 
   public async handleRequest(request: Request, sender: WebContents): Promise<any> {
     switch (request.type) {
@@ -106,7 +112,7 @@ class ProxyServerHandler {
   }
 
   public unsubscribeAll(): void {
-    Object.values(this.subscriptions).forEach((subscription) => subscription.unsubscribe());
+    Object.values(this.subscriptions).forEach((subscription) => subscription?.unsubscribe?.());
     this.subscriptions = {};
   }
 
@@ -133,7 +139,8 @@ class ProxyServerHandler {
       throw new IpcProxyError(`Remote property [${propKey}] is not an observable`);
     }
     if (typeof subscriptionId !== 'string') {
-      throw new IpcProxyError(`subscriptionId [${subscriptionId}] is not a string`);
+      // this will probably not happen
+      throw new IpcProxyError(`subscriptionId [${subscriptionId as unknown as string}] is not a string`);
     }
 
     this.doSubscribe(obs, subscriptionId, sender);
@@ -153,14 +160,14 @@ class ProxyServerHandler {
       throw new IpcProxyError(`Remote function [${propKey}] did not return an observable`);
     }
     if (typeof subscriptionId !== 'string') {
-      throw new IpcProxyError(`subscriptionId [${subscriptionId}] is not a string`);
+      throw new IpcProxyError(`subscriptionId [${subscriptionId as unknown as string}] is not a string`);
     }
 
     this.doSubscribe(obs, subscriptionId, sender);
   }
 
   private doSubscribe(obs: Observable<any>, subscriptionId: string, sender: WebContents): void {
-    if (this.subscriptions[subscriptionId]) {
+    if (this.subscriptions[subscriptionId] !== undefined) {
       throw new IpcProxyError(`A subscription with Id [${subscriptionId}] already exists`);
     }
 
@@ -186,7 +193,7 @@ class ProxyServerHandler {
   private handleUnsubscribe(request: UnsubscribeRequest): void {
     const { subscriptionId } = request;
 
-    if (!this.subscriptions[subscriptionId]) {
+    if (this.subscriptions[subscriptionId] === undefined) {
       throw new IpcProxyError(`Subscription with Id [${subscriptionId}] does not exist`);
     }
 
@@ -196,8 +203,9 @@ class ProxyServerHandler {
   private doUnsubscribe(subscriptionId: string): void {
     const subscription = this.subscriptions[subscriptionId];
 
-    if (subscription) {
+    if (subscription !== undefined) {
       subscription.unsubscribe();
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete this.subscriptions[subscriptionId];
     }
   }
