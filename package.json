@@ -1,0 +1,28 @@
+{
+  "name": "electron-ipc-cat",
+  "version": "1.0.0",
+  "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linonetwo/electron-ipc-cat.git"
+  },
+  "keywords": [
+    "electron",
+    "ipc",
+    "proxy",
+    "preload",
+    "remote",
+    "main",
+    "renderer"
+  ],
+  "author": "lin onetwo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/linonetwo/electron-ipc-cat/issues"
+  },
+  "homepage": "https://github.com/linonetwo/electron-ipc-cat#readme"
+}
