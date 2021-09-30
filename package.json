@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "publish-": "npm run clean && npm run build && cp package.json dist/package.json && cp Readme.md dist/Readme.md && cd dist && npm publish && npm run clean",
     "clean": "rm -rf ./dist",
+    "prepare": "npm-install-peers",
     "installType": "typesync"
   },
   "repository": {
@@ -59,10 +60,11 @@
     "eslint-plugin-security-node": "1.0.14",
     "eslint-plugin-typescript-sort-keys": "1.8.0",
     "eslint-plugin-unicorn": "36.0.0",
+    "npm-install-peers": "^1.2.2",
     "typescript": "4.4.3",
     "typesync": "0.8.0"
   },
   "peerDependencies": {
-    "electron": "*"
+    "electron": ">= 13.0.0"
   }
 }
