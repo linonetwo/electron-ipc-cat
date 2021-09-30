@@ -1,6 +1,6 @@
 {
   "name": "electron-ipc-cat",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/index.js",
   "scripts": {
@@ -63,6 +63,6 @@
     "typesync": "0.8.0"
   },
   "peerDependencies": {
-    "electron": "^14.0.1"
+    "electron": "*"
   }
 }
