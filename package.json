@@ -1,12 +1,12 @@
 {
   "name": "electron-ipc-cat",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "publish-": "npm run clean && npm run build && cp package.json dist/package.json && cp Readme.md dist/Readme.md && cd dist && npm publish && npm run clean",
+    "publish-real": "npm run clean && npm run build && cp package.json dist && cp Readme.md dist && cd dist && npm publish && npm run clean",
     "clean": "rm -rf ./dist",
     "prepare": "npm-install-peers",
     "installType": "typesync"
