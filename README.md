@@ -179,3 +179,20 @@ The packages exposes 2 entry points in the "main" and "browser" fields of packag
 ## See it working
 
 [Example in TiddlyGit](https://github.com/tiddly-gittly/TiddlyGit-Desktop/blob/0c6b26c0c1113e0c66d6f49f022c5733d4fa85e8/src/preload/common/services.ts#L27-L42)
+
+## FAQ
+
+### reject string
+
+You should reject an Error, other wise `errio` can't handle it well.
+
+```diff
+- reject(errorMessage);
++ reject(new Error(errorMessage));
+```
+
+Possible error:
+
+```js
+Cannot read properties of undefined (reading 'options') at Object.exports.toObject (node_modules/errio/index.js:92:1)
+```
