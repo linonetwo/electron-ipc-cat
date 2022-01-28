@@ -13,7 +13,7 @@ export type ProxyWithOutObservable<OriginalProxy> = Omit<OriginalProxy, ProxyObs
  * Note this type only promisify methods that return things, not methods that returns observable.
  */
 export type AsyncifyProxy<
-  OriginalProxy extends Record<string, (..._arguments: never) => any>,
+  OriginalProxy extends Record<string, any>,
   ObservableKey extends ProxyObservableProperties<OriginalProxy> = ProxyObservableProperties<OriginalProxy>,
   AsyncKey extends Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey> = Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey>,
 > = {
