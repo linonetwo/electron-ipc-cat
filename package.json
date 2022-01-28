@@ -1,12 +1,38 @@
 {
   "name": "electron-ipc-cat",
-  "version": "1.2.0",
+  "version": "1.2.4",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
-  "main": "dist/index.js",
+  "main": "dist/common.js",
+  "exports": {
+    "client": "./dist/client.js",
+    "server": "./dist/server.js",
+    "common": "./dist/common.js",
+    "fixContextIsolation": "./dist/fixContextIsolation.js",
+    "utils": "./dist/utils.js"
+  },
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./dist/client.d.ts"
+      ],
+      "server": [
+        "./dist/server.d.ts"
+      ],
+      "fixContextIsolation": [
+        "./dist/fixContextIsolation.d.ts"
+      ],
+      "utils": [
+        "./dist/utils.d.ts"
+      ],
+      "common": [
+        "./dist/common.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "publish-real": "npm run clean && npm run build && cp package.json dist && cp Readme.md dist && cd dist && npm publish && npm run clean",
+    "prepublishOnly": "npm run clean && npm run build",
     "clean": "rm -rf ./dist",
     "prepare": "npm-install-peers",
     "installType": "typesync"
@@ -29,6 +55,9 @@
   "bugs": {
     "url": "https://github.com/linonetwo/electron-ipc-cat/issues"
   },
+  "files": [
+    "dist"
+  ],
   "homepage": "https://github.com/linonetwo/electron-ipc-cat#readme",
   "dependencies": {
     "errio": "1.2.2",
