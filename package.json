@@ -1,6 +1,6 @@
 {
   "name": "electron-ipc-cat",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/common.js",
   "exports": {
@@ -62,8 +62,8 @@
   "dependencies": {
     "errio": "1.2.2",
     "lodash": "4.17.21",
-    "rxjs": "7.5.2",
-    "type-fest": "^2.11.0",
+    "rxjs": "7.5.4",
+    "type-fest": "^2.12.0",
     "uuid": "8.3.2"
   },
   "devDependencies": {
@@ -71,10 +71,10 @@
     "@types/eslint-plugin-prettier": "3.1.0",
     "@types/lodash": "4.14.178",
     "@types/uuid": "8.3.4",
-    "@typescript-eslint/eslint-plugin": "5.10.1",
-    "@typescript-eslint/parser": "5.10.1",
-    "eslint": "8.7.0",
-    "eslint-config-prettier": "8.3.0",
+    "@typescript-eslint/eslint-plugin": "5.12.0",
+    "@typescript-eslint/parser": "5.12.0",
+    "eslint": "8.9.0",
+    "eslint-config-prettier": "8.4.0",
     "eslint-config-standard": "16.0.3",
     "eslint-config-standard-with-typescript": "21.0.1",
     "eslint-import-resolver-alias": "1.1.2",
@@ -89,7 +89,7 @@
     "eslint-plugin-security": "1.4.0",
     "eslint-plugin-security-node": "1.1.1",
     "eslint-plugin-typescript-sort-keys": "2.1.0",
-    "eslint-plugin-unicorn": "40.1.0",
+    "eslint-plugin-unicorn": "41.0.0",
     "npm-install-peers": "^1.2.2",
     "typescript": "4.5.5",
     "typesync": "0.8.0"
