@@ -1,7 +1,6 @@
 import { Subscribable, Observer, TeardownLogic, Observable, isObservable } from 'rxjs';
 import { IpcRenderer, ipcRenderer, Event } from 'electron';
 import { memoize } from 'lodash';
-import { v4 as uuid } from 'uuid';
 import Errio from 'errio';
 import { getSubscriptionKey, IpcProxyError } from './utils';
 import { Request, RequestType, Response, ResponseType, ProxyDescriptor, ProxyPropertyType } from './common';
@@ -80,7 +79,7 @@ function getProperty(
 }
 
 async function makeRequest(request: Request, channel: string, transport: IpcRenderer): Promise<unknown> {
-  const correlationId = uuid();
+  const correlationId = String(Math.random());
   transport.send(channel, request, correlationId);
 
   return await new Promise((resolve, reject) => {
@@ -99,7 +98,7 @@ async function makeRequest(request: Request, channel: string, transport: IpcRend
 
 function makeObservable(request: Request, channel: string, ObservableCtor: ObservableConstructor, transport: IpcRenderer): Subscribable<any> {
   return new ObservableCtor((observer) => {
-    const subscriptionId = uuid();
+    const subscriptionId = String(Math.random());
     const subscriptionRequest = { ...request, subscriptionId };
 
     transport.on(subscriptionId, (event: Event, response: Response) => {
