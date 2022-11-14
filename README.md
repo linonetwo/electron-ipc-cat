@@ -184,15 +184,9 @@ The packages exposes 2 entry points in the "main" and "browser" fields of packag
 
 ### reject string
 
-You should reject an Error, other wise `errio` can't handle it well.
+You should reject an Error, other wise `serialize-error` can't handle it well.
 
 ```diff
 - reject(errorMessage);
 + reject(new Error(errorMessage));
-```
-
-Possible error:
-
-```js
-Cannot read properties of undefined (reading 'options') at Object.exports.toObject (node_modules/errio/index.js:92:1)
 ```

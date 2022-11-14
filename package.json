@@ -60,8 +60,8 @@
   ],
   "homepage": "https://github.com/linonetwo/electron-ipc-cat#readme",
   "dependencies": {
-    "errio": "^1.2.2",
     "lodash": "^4.17.21",
+    "serialize-error": "^11.0.0",
     "type-fest": "^2.19.0"
   },
   "devDependencies": {

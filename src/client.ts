@@ -1,7 +1,7 @@
 import { Subscribable, Observer, TeardownLogic, Observable, isObservable } from 'rxjs';
 import { IpcRenderer, ipcRenderer, Event } from 'electron';
 import { memoize } from 'lodash';
-import Errio from 'errio';
+import { deserializeError } from 'serialize-error';
 import { getSubscriptionKey, IpcProxyError } from './utils';
 import { Request, RequestType, Response, ResponseType, ProxyDescriptor, ProxyPropertyType } from './common';
 
@@ -88,7 +88,7 @@ async function makeRequest(request: Request, channel: string, transport: IpcRend
         case ResponseType.Result:
           return resolve(response.result);
         case ResponseType.Error:
-          return reject(Errio.parse(response.error));
+          return reject(deserializeError(response.error));
         default:
           return reject(new IpcProxyError(`Unhandled response type [${response.type}]`));
       }
@@ -106,7 +106,7 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
         case ResponseType.Next:
           return observer.next(response.value);
         case ResponseType.Error:
-          return observer.error(Errio.parse(response.error));
+          return observer.error(deserializeError(response.error));
         case ResponseType.Complete:
           return observer.complete();
         default:

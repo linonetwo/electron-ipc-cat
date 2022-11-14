@@ -1,8 +1,3 @@
-declare module 'errio' {
-  export function parse(error: Error): Error;
-  export function stringify(error: Error): string;
-  export function register(error: ErrorConstructor): void;
-}
 declare module '@tiddlygit/tiddlywiki' {
   export interface I$TW {
     boot: { argv: string[]; startup: (options: { callback: () => unknown }) => void };

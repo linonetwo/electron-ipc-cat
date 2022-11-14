@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Observable, Subscription, isObservable } from 'rxjs';
 import { ipcMain, IpcMain, WebContents, IpcMainEvent } from 'electron';
-import Errio from 'errio';
+import { serializeError } from 'serialize-error';
 import { IpcProxyError, isFunction } from './utils';
 import {
   Request,
@@ -67,7 +67,7 @@ export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transpo
             stringifiedRequest = request.type;
           }
           logger?.error?.(`E-0 IPC Error on ${channel} ${stringifiedRequest} ${(error as Error).message} ${(error as Error).stack ?? ''}`);
-          sender.send(correlationId, { type: ResponseType.Error, error: Errio.stringify(error) });
+          sender.send(correlationId, { type: ResponseType.Error, error: serializeError(error, { maxDepth: 1 }) });
           sender.removeListener('destroyed', nullify);
         }
       });
@@ -173,7 +173,7 @@ class ProxyServerHandler {
 
     this.subscriptions[subscriptionId] = obs.subscribe(
       (value) => sender.send(subscriptionId, { type: ResponseType.Next, value }),
-      (error: Error) => sender.send(subscriptionId, { type: ResponseType.Error, error: Errio.stringify(error) }),
+      (error: Error) => sender.send(subscriptionId, { type: ResponseType.Error, error: serializeError(error, { maxDepth: 1 }) }),
       () => sender.send(subscriptionId, { type: ResponseType.Complete }),
     );
 

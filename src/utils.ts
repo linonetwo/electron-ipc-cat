@@ -1,4 +1,4 @@
-import Errio from 'errio';
+import { errorConstructors } from 'serialize-error';
 
 /* Custom Error */
 export class IpcProxyError extends Error {
@@ -7,7 +7,7 @@ export class IpcProxyError extends Error {
     this.name = this.constructor.name;
   }
 }
-Errio.register(IpcProxyError as ErrorConstructor);
+errorConstructors.set('IpcProxyError', IpcProxyError as ErrorConstructor);
 
 /* Utils */
 // eslint-disable-next-line @typescript-eslint/ban-types
