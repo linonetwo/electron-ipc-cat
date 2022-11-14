@@ -101,7 +101,7 @@ export interface ResultResponse {
 }
 
 export interface ErrorResponse {
-  error: Error;
+  error: string;
   type: ResponseType.Error;
 }
 

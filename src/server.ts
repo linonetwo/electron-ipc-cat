@@ -67,7 +67,7 @@ export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transpo
             stringifiedRequest = request.type;
           }
           logger?.error?.(`E-0 IPC Error on ${channel} ${stringifiedRequest} ${(error as Error).message} ${(error as Error).stack ?? ''}`);
-          sender.send(correlationId, { type: ResponseType.Error, error: serializeError(error, { maxDepth: 1 }) });
+          sender.send(correlationId, { type: ResponseType.Error, error: JSON.stringify(serializeError(error, { maxDepth: 1 })) });
           sender.removeListener('destroyed', nullify);
         }
       });
@@ -173,7 +173,7 @@ class ProxyServerHandler {
 
     this.subscriptions[subscriptionId] = obs.subscribe(
       (value) => sender.send(subscriptionId, { type: ResponseType.Next, value }),
-      (error: Error) => sender.send(subscriptionId, { type: ResponseType.Error, error: serializeError(error, { maxDepth: 1 }) }),
+      (error: Error) => sender.send(subscriptionId, { type: ResponseType.Error, error: JSON.stringify(serializeError(error, { maxDepth: 1 })) }),
       () => sender.send(subscriptionId, { type: ResponseType.Complete }),
     );
 

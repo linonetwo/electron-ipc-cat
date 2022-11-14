@@ -88,7 +88,7 @@ async function makeRequest(request: Request, channel: string, transport: IpcRend
         case ResponseType.Result:
           return resolve(response.result);
         case ResponseType.Error:
-          return reject(deserializeError(response.error));
+          return reject(deserializeError(JSON.parse(response.error)));
         default:
           return reject(new IpcProxyError(`Unhandled response type [${response.type}]`));
       }
@@ -106,7 +106,7 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
         case ResponseType.Next:
           return observer.next(response.value);
         case ResponseType.Error:
-          return observer.error(deserializeError(response.error));
+          return observer.error(deserializeError(JSON.parse(response.error)));
         case ResponseType.Complete:
           return observer.complete();
         default:
