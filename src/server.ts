@@ -3,25 +3,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Observable, Subscription, isObservable } from 'rxjs';
-import { ipcMain, IpcMain, WebContents, IpcMainEvent } from 'electron';
+import { IpcMain, ipcMain, IpcMainEvent, WebContents } from 'electron';
+import { isObservable, Observable, Subscription } from 'rxjs';
 import { serializeError } from 'serialize-error';
+import { ApplyRequest, ApplySubscribeRequest, GetRequest, ProxyDescriptor, Request, RequestType, ResponseType, SubscribeRequest, UnsubscribeRequest } from './common';
 import { IpcProxyError, isFunction } from './utils';
-import {
-  Request,
-  RequestType,
-  ResponseType,
-  GetRequest,
-  ApplyRequest,
-  SubscribeRequest,
-  UnsubscribeRequest,
-  ProxyDescriptor,
-  ProxyPropertyType,
-  ApplySubscribeRequest,
-} from './common';
 
 // TODO: make it to be able to use @decorator, instead of write a description json. We can defer the setup of ipc handler to make this possible.
-const registrations: { [channel: string]: ProxyServerHandler | null } = {};
+const registrations: Record<string, ProxyServerHandler | null> = {};
 
 const exampleLogger = Object.assign(console, {
   emerg: console.error.bind(console),
@@ -62,7 +51,7 @@ export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transpo
         if (sender !== undefined) {
           let stringifiedRequest = '';
           try {
-            stringifiedRequest = request !== undefined ? JSON.stringify(request) : '';
+            stringifiedRequest = request === undefined ? '' : JSON.stringify(request);
           } catch {
             stringifiedRequest = request.type;
           }
@@ -73,7 +62,9 @@ export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transpo
       });
   });
 
-  return () => unregisterProxy(channel, transport);
+  return () => {
+    unregisterProxy(channel, transport);
+  };
 }
 
 function unregisterProxy(channel: string, transport: IpcMain): void {
@@ -92,22 +83,31 @@ function unregisterProxy(channel: string, transport: IpcMain): void {
 class ProxyServerHandler {
   constructor(private readonly target: any) {}
 
-  private subscriptions: { [subscriptionId: string]: Subscription | undefined } = {};
+  private subscriptions: Record<string, Subscription | undefined> = {};
 
   public async handleRequest(request: Request, sender: WebContents): Promise<any> {
     switch (request.type) {
-      case RequestType.Get:
+      case RequestType.Get: {
         return await this.handleGet(request);
-      case RequestType.Apply:
+      }
+      case RequestType.Apply: {
         return this.handleApply(request);
-      case RequestType.Subscribe:
-        return this.handleSubscribe(request, sender);
-      case RequestType.ApplySubscribe:
-        return this.handleApplySubscribe(request, sender);
-      case RequestType.Unsubscribe:
-        return this.handleUnsubscribe(request);
-      default:
+      }
+      case RequestType.Subscribe: {
+        this.handleSubscribe(request, sender);
+        return;
+      }
+      case RequestType.ApplySubscribe: {
+        this.handleApplySubscribe(request, sender);
+        return;
+      }
+      case RequestType.Unsubscribe: {
+        this.handleUnsubscribe(request);
+        return;
+      }
+      default: {
         throw new IpcProxyError(`Unhandled RequestType [${request.type}]`);
+      }
     }
   }
 
@@ -172,9 +172,15 @@ class ProxyServerHandler {
     }
 
     this.subscriptions[subscriptionId] = obs.subscribe(
-      (value) => sender.send(subscriptionId, { type: ResponseType.Next, value }),
-      (error: Error) => sender.send(subscriptionId, { type: ResponseType.Error, error: JSON.stringify(serializeError(error, { maxDepth: 1 })) }),
-      () => sender.send(subscriptionId, { type: ResponseType.Complete }),
+      (value) => {
+        sender.send(subscriptionId, { type: ResponseType.Next, value });
+      },
+      (error: Error) => {
+        sender.send(subscriptionId, { type: ResponseType.Error, error: JSON.stringify(serializeError(error, { maxDepth: 1 })) });
+      },
+      () => {
+        sender.send(subscriptionId, { type: ResponseType.Complete });
+      },
     );
 
     /*
@@ -211,4 +217,4 @@ class ProxyServerHandler {
   }
 }
 
-export { ProxyDescriptor, ProxyPropertyType };
+export type { ProxyDescriptor, ProxyPropertyType } from './common';

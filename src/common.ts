@@ -1,5 +1,5 @@
-import { Asyncify, ConditionalKeys } from 'type-fest';
 import { Observable } from 'rxjs';
+import { Asyncify, ConditionalKeys } from 'type-fest';
 
 export type ProxyAsyncProperties<OriginalProxy> = ConditionalKeys<OriginalProxy, (..._arguments: never) => any>;
 export type ProxyObservableProperties<OriginalProxy> =
@@ -16,11 +16,13 @@ export type AsyncifyProxy<
   OriginalProxy extends Record<string, any>,
   ObservableKey extends ProxyObservableProperties<OriginalProxy> = ProxyObservableProperties<OriginalProxy>,
   AsyncKey extends Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey> = Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey>,
-> = {
-  [P in AsyncKey]: Asyncify<OriginalProxy[P]>;
-} & {
-  [Q in ObservableKey]: OriginalProxy[Q];
-};
+> =
+  & {
+    [P in AsyncKey]: Asyncify<OriginalProxy[P]>;
+  }
+  & {
+    [Q in ObservableKey]: OriginalProxy[Q];
+  };
 
 /** Extract observable keys from services */
 export type IServicesWithOnlyObservables<Services> = {
@@ -40,7 +42,7 @@ export enum ProxyPropertyType {
 
 export interface ProxyDescriptor {
   channel: string;
-  properties: { [propKey: string]: ProxyPropertyType };
+  properties: Record<string, ProxyPropertyType>;
 }
 
 /* Request Types */

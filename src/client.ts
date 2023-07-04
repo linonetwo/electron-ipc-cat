@@ -1,11 +1,11 @@
-import { Subscribable, Observer, TeardownLogic, Observable, isObservable } from 'rxjs';
-import { IpcRenderer, ipcRenderer, Event } from 'electron';
+import { Event, IpcRenderer, ipcRenderer } from 'electron';
 import { memoize } from 'lodash';
+import { isObservable, Observable, Observer, Subscribable, TeardownLogic } from 'rxjs';
 import { deserializeError } from 'serialize-error';
+import { ProxyDescriptor, ProxyPropertyType, Request, RequestType, Response, ResponseType } from './common';
 import { getSubscriptionKey, IpcProxyError } from './utils';
-import { Request, RequestType, Response, ResponseType, ProxyDescriptor, ProxyPropertyType } from './common';
 
-export type ObservableConstructor = new (subscribe: (obs: Observer<any>) => TeardownLogic) => Subscribable<any>;
+export type ObservableConstructor = new(subscribe: (obs: Observer<any>) => TeardownLogic) => Subscribable<any>;
 
 export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: ObservableConstructor = Observable, transport: IpcRenderer = ipcRenderer): T {
   const result = {};
@@ -27,19 +27,23 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
         get: memoize(() => (next: (value?: any) => void) => {
           const originalObservable = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
           if (isObservable(originalObservable)) {
-            originalObservable.subscribe((value: any) => next(value));
+            originalObservable.subscribe((value: any) => {
+              next(value);
+            });
           }
         }),
       });
     } else if (propertyType === ProxyPropertyType.Function$) {
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
-        get: memoize(() => (...arguments_: any[]) => (next: (value?: any) => void) => {
+        get: memoize(() => (...arguments_: unknown[]) => (next: (value?: any) => void) => {
           const originalObservableFunction = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
           if (typeof originalObservableFunction === 'function') {
             const originalObservable = originalObservableFunction(...arguments_);
             if (isObservable(originalObservable)) {
-              originalObservable.subscribe((value: any) => next(value));
+              originalObservable.subscribe((value: any) => {
+                next(value);
+              });
             }
           }
         }),
@@ -47,7 +51,7 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
     } else {
       Object.defineProperty(result, propertyKey, {
         enumerable: true,
-        get: memoize(() => getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport)),
+        get: memoize(async () => await getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport) as unknown),
       });
     }
   });
@@ -63,18 +67,22 @@ function getProperty(
   transport: IpcRenderer,
 ): Promise<any> | Subscribable<any> | ((...arguments_: any[]) => Promise<any>) | ((...arguments_: any[]) => Subscribable<any>) {
   switch (propertyType) {
-    case ProxyPropertyType.Value:
+    case ProxyPropertyType.Value: {
       return makeRequest({ type: RequestType.Get, propKey: propertyKey }, channel, transport);
-    case ProxyPropertyType.Value$:
+    }
+    case ProxyPropertyType.Value$: {
       return makeObservable({ type: RequestType.Subscribe, propKey: propertyKey }, channel, ObservableCtor, transport);
-    case ProxyPropertyType.Function:
+    }
+    case ProxyPropertyType.Function: {
       return async (...arguments_: unknown[]) => await makeRequest({ type: RequestType.Apply, propKey: propertyKey, args: arguments_ }, channel, transport);
-    case ProxyPropertyType.Function$:
-      return (...arguments_: any[]) =>
-        makeObservable({ type: RequestType.ApplySubscribe, propKey: propertyKey, args: arguments_ }, channel, ObservableCtor, transport);
-    default:
+    }
+    case ProxyPropertyType.Function$: {
+      return (...arguments_: any[]) => makeObservable({ type: RequestType.ApplySubscribe, propKey: propertyKey, args: arguments_ }, channel, ObservableCtor, transport);
+    }
+    default: {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new IpcProxyError(`Unrecognised ProxyPropertyType [${propertyType}]`);
+    }
   }
 }
 
@@ -85,12 +93,17 @@ async function makeRequest(request: Request, channel: string, transport: IpcRend
   return await new Promise((resolve, reject) => {
     transport.once(correlationId, (event: Event, response: Response) => {
       switch (response.type) {
-        case ResponseType.Result:
-          return resolve(response.result);
-        case ResponseType.Error:
-          return reject(deserializeError(JSON.parse(response.error)));
-        default:
-          return reject(new IpcProxyError(`Unhandled response type [${response.type}]`));
+        case ResponseType.Result: {
+          resolve(response.result);
+          return;
+        }
+        case ResponseType.Error: {
+          reject(deserializeError(JSON.parse(response.error)));
+          return;
+        }
+        default: {
+          reject(new IpcProxyError(`Unhandled response type [${response.type}]`));
+        }
       }
     });
   });
@@ -103,14 +116,21 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
 
     transport.on(subscriptionId, (event: Event, response: Response) => {
       switch (response.type) {
-        case ResponseType.Next:
-          return observer.next(response.value);
-        case ResponseType.Error:
-          return observer.error(deserializeError(JSON.parse(response.error)));
-        case ResponseType.Complete:
-          return observer.complete();
-        default:
-          return observer.error(new IpcProxyError(`Unhandled response type [${response.type}]`));
+        case ResponseType.Next: {
+          observer.next(response.value);
+          return;
+        }
+        case ResponseType.Error: {
+          observer.error(deserializeError(JSON.parse(response.error)));
+          return;
+        }
+        case ResponseType.Complete: {
+          observer.complete();
+          return;
+        }
+        default: {
+          observer.error(new IpcProxyError(`Unhandled response type [${response.type}]`));
+        }
       }
     });
 
@@ -129,4 +149,4 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
   });
 }
 
-export { ProxyDescriptor, ProxyPropertyType };
+export type { ProxyDescriptor, ProxyPropertyType } from './common';

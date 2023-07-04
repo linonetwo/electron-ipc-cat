@@ -32,7 +32,9 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
     // Process all Observables, we pass a `.next` function from preload script, that we can used to reconstruct Observable
     if (ProxyPropertyType.Value$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
       const subscribedObservable = new Observable((observer) => {
-        service[getSubscriptionKey(key)]((value: any) => observer.next(value));
+        service[getSubscriptionKey(key)]((value: any) => {
+          observer.next(value);
+        });
       }) as T[keyof T];
       // store newly created Observable to `(window as IWindow).observables.xxx.yyy`
       if ((window as unknown as IWindow).observables[name as string] === undefined) {
@@ -47,7 +49,9 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
     if (ProxyPropertyType.Function$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
       const subscribingObservable = (...arguments_: any[]): T[keyof T] =>
         new Observable((observer) => {
-          service[getSubscriptionKey(key)](...arguments_)((value: any) => observer.next(value));
+          service[getSubscriptionKey(key)](...arguments_)((value: any) => {
+            observer.next(value);
+          });
         }) as T[keyof T];
       // store newly created Observable to `(window as IWindow).observables.xxx.yyy`
       if ((window as unknown as IWindow).observables[name as string] === undefined) {
@@ -69,7 +73,7 @@ export function fixContextIsolation(): void {
 
   for (const key in services) {
     const serviceName = key as Exclude<keyof IWindow['service'], 'descriptors'>;
-    ipcProxyFixContextIsolation(serviceName, services[serviceName as string], descriptors[serviceName as number]);
+    ipcProxyFixContextIsolation(serviceName, services[serviceName as string], descriptors[serviceName as number] as ProxyDescriptor);
   }
 }
 fixContextIsolation();
