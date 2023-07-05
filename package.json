@@ -1,6 +1,6 @@
 {
   "name": "electron-ipc-cat",
-  "version": "1.3.0",
+  "version": "1.3.6",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/common.js",
   "exports": {
@@ -60,7 +60,7 @@
   ],
   "homepage": "https://github.com/linonetwo/electron-ipc-cat#readme",
   "dependencies": {
-    "lodash": "^4.17.21",
+    "memize": "^2.1.0",
     "serialize-error": "^11.0.0",
     "type-fest": "^2.19.0"
   },
@@ -68,7 +68,7 @@
     "@types/lodash": "^4.14.189",
     "dprint": "^0.38.3",
     "electron": "^25.2.0",
-    "eslint-config-tidgi": "^1.1.1",
+    "eslint-config-tidgi": "^1.1.2",
     "npm-install-peers": "^1.2.2",
     "rxjs": "^7.8.1",
     "typescript": "^4.8.4",

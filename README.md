@@ -16,6 +16,12 @@ Luckily we have frankwallis/electron-ipc-proxy which provide a good example abou
 
 We wrap our main process class, and can use them from the `window.xxx` in the renderer and preload script. All types are preserved, so you can get typescript intellisense just like using a local function.
 
+## Install
+
+```sh
+pnpm i electron-ipc-cat
+```
+
 ## Example
 
 Real use case in [TiddlyGit-Desktop's workspace feature](https://github.com/tiddly-gittly/TiddlyGit-Desktop/blob/master/src/services/workspaces/index.ts)
