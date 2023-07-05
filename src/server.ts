@@ -171,17 +171,17 @@ class ProxyServerHandler {
       throw new IpcProxyError(`A subscription with Id [${subscriptionId}] already exists`);
     }
 
-    this.subscriptions[subscriptionId] = obs.subscribe(
-      (value) => {
+    this.subscriptions[subscriptionId] = obs.subscribe({
+      next: (value) => {
         sender.send(subscriptionId, { type: ResponseType.Next, value });
       },
-      (error: Error) => {
+      error: (error: Error) => {
         sender.send(subscriptionId, { type: ResponseType.Error, error: JSON.stringify(serializeError(error, { maxDepth: 1 })) });
       },
-      () => {
+      complete: () => {
         sender.send(subscriptionId, { type: ResponseType.Complete });
       },
-    );
+    });
 
     /*
      * If the sender does not clean up after itself then we need to do it

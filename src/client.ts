@@ -1,3 +1,6 @@
+/**
+ * This file runs in electron preload script
+ */
 import { Event, IpcRenderer, ipcRenderer } from 'electron';
 import memoize from 'memize';
 import { isObservable, Observable, Observer, Subscribable, TeardownLogic } from 'rxjs';
@@ -25,9 +28,9 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
         get: memoize(() => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void) | undefined) => {
-          const originalObservable = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
-          if (isObservable(originalObservable)) {
-            originalObservable.subscribe(observerOrNext);
+          const ipcProxyObservable = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
+          if (isObservable(ipcProxyObservable)) {
+            ipcProxyObservable.subscribe(observerOrNext);
           }
         }),
       });
@@ -35,11 +38,11 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
         get: memoize(() => (...arguments_: unknown[]) => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void) | undefined) => {
-          const originalObservableFunction = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
-          if (typeof originalObservableFunction === 'function') {
-            const originalObservable = originalObservableFunction(...arguments_);
-            if (isObservable(originalObservable)) {
-              originalObservable.subscribe(observerOrNext);
+          const ipcProxyObservableFunction = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
+          if (typeof ipcProxyObservableFunction === 'function') {
+            const ipcProxyObservable = ipcProxyObservableFunction(...arguments_);
+            if (isObservable(ipcProxyObservable)) {
+              ipcProxyObservable.subscribe(observerOrNext);
             }
           }
         }),
@@ -110,6 +113,14 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
     const subscriptionId = String(Math.random());
     const subscriptionRequest = { ...request, subscriptionId };
 
+    const onComplete = () => {
+      makeRequest({ type: RequestType.Unsubscribe, subscriptionId }, channel, transport).catch((error) => {
+        console.log('Error unsubscribing from remote observale', error);
+        observer.error(error);
+      });
+      transport.removeAllListeners(subscriptionId);
+    };
+
     transport.on(subscriptionId, (event: Event, response: Response) => {
       switch (response.type) {
         case ResponseType.Next: {
@@ -135,13 +146,7 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
       observer.error(error);
     });
 
-    return () => {
-      transport.removeAllListeners(subscriptionId);
-      makeRequest({ type: RequestType.Unsubscribe, subscriptionId }, channel, transport).catch((error) => {
-        console.log('Error unsubscribing from remote observale', error);
-        observer.error(error);
-      });
-    };
+    return onComplete;
   });
 }
 
