@@ -8,7 +8,7 @@
  * We cannot pass Observable across contextBridge, so we have to add a hidden patch to the object on preload script, and use that patch to regenerate Observable on renderer side
  * This file is "unsafe" and will full of type warnings, which is necessary
  */
-import { Observable } from 'rxjs';
+import { Observable, type Observer, type Subscriber } from 'rxjs';
 import { IServicesWithOnlyObservables, IServicesWithoutObservables, ProxyDescriptor, ProxyPropertyType } from './common';
 import { getSubscriptionKey } from './utils';
 
@@ -16,6 +16,8 @@ interface IWindow {
   observables: IServicesWithOnlyObservables<any>;
   service: IServicesWithoutObservables<any>;
 }
+
+type UnpackObservable<T> = T extends Observable<infer R> ? R : never;
 
 /**
  * Create `(window as IWindow).observables.xxx` from `(window as IWindow).service.xxx`
@@ -47,12 +49,22 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
     }
     // create (id: string) => Observable
     if (ProxyPropertyType.Function$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
-      const subscribingObservable = (...arguments_: any[]): T[keyof T] =>
-        new Observable((observer) => {
-          service[getSubscriptionKey(key)](...arguments_)((value: any) => {
-            observer.next(value);
+      const subscribingObservable = <K extends Extract<keyof T, string>, InsideObservable extends UnpackObservable<T[K]>>(key: K, ...arguments_: unknown[]): T[K] =>
+        new Observable<InsideObservable>((subscriber: Subscriber<InsideObservable>) => {
+          const serviceMethodReturnedObservable = service[getSubscriptionKey(key)](...arguments_) as (observer: Observer<InsideObservable>) => void;
+          serviceMethodReturnedObservable({
+            next: (value: InsideObservable) => {
+              subscriber.next(value);
+            },
+            error: (error: any) => {
+              subscriber.error(error);
+            },
+            complete: () => {
+              subscriber.complete();
+            },
           });
-        }) as T[keyof T];
+        }) as T[K];
+
       // store newly created Observable to `(window as IWindow).observables.xxx.yyy`
       if ((window as unknown as IWindow).observables[name as string] === undefined) {
         ((window as unknown as IWindow).observables as any)[name] = {
