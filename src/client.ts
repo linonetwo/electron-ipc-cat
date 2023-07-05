@@ -1,5 +1,5 @@
 import { Event, IpcRenderer, ipcRenderer } from 'electron';
-import { memoize } from 'lodash';
+import memoize from 'memize';
 import { isObservable, Observable, Observer, Subscribable, TeardownLogic } from 'rxjs';
 import { deserializeError } from 'serialize-error';
 import { ProxyDescriptor, ProxyPropertyType, Request, RequestType, Response, ResponseType } from './common';
@@ -24,26 +24,22 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
     if (propertyType === ProxyPropertyType.Value$) {
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
-        get: memoize(() => (next: (value?: any) => void) => {
+        get: memoize(() => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void) | undefined) => {
           const originalObservable = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
           if (isObservable(originalObservable)) {
-            originalObservable.subscribe((value: any) => {
-              next(value);
-            });
+            originalObservable.subscribe(observerOrNext);
           }
         }),
       });
     } else if (propertyType === ProxyPropertyType.Function$) {
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
-        get: memoize(() => (...arguments_: unknown[]) => (next: (value?: any) => void) => {
+        get: memoize(() => (...arguments_: unknown[]) => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void) | undefined) => {
           const originalObservableFunction = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
           if (typeof originalObservableFunction === 'function') {
             const originalObservable = originalObservableFunction(...arguments_);
             if (isObservable(originalObservable)) {
-              originalObservable.subscribe((value: any) => {
-                next(value);
-              });
+              originalObservable.subscribe(observerOrNext);
             }
           }
         }),
@@ -51,7 +47,7 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
     } else {
       Object.defineProperty(result, propertyKey, {
         enumerable: true,
-        get: memoize(async () => await getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport) as unknown),
+        get: memoize(() => getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport) as unknown),
       });
     }
   });

@@ -1,5 +1,5 @@
-import { Observable } from 'rxjs';
-import { Asyncify, ConditionalKeys } from 'type-fest';
+import type { Observable } from 'rxjs';
+import type { Asyncify, ConditionalKeys } from 'type-fest';
 
 export type ProxyAsyncProperties<OriginalProxy> = ConditionalKeys<OriginalProxy, (..._arguments: never) => any>;
 export type ProxyObservableProperties<OriginalProxy> =

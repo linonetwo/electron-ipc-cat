@@ -33,9 +33,19 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
   for (const key in descriptor.properties) {
     // Process all Observables, we pass a `.next` function from preload script, that we can used to reconstruct Observable
     if (ProxyPropertyType.Value$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
-      const subscribedObservable = new Observable((observer) => {
-        service[getSubscriptionKey(key)]((value: any) => {
-          observer.next(value);
+      const subscribedObservable = new Observable((subscriber: Subscriber<unknown>) => {
+        const serviceMethodReturnedObservable = service[getSubscriptionKey(key)] as T[keyof T];
+        // can't use `serviceMethodReturnedObservable(subscriber)` here, because `subscriber` is not serializable during contextBridge
+        serviceMethodReturnedObservable({
+          next: (value: unknown) => {
+            subscriber.next(value);
+          },
+          complete: () => {
+            subscriber.complete();
+          },
+          error: (error: unknown) => {
+            subscriber.error(error);
+          },
         });
       }) as T[keyof T];
       // store newly created Observable to `(window as IWindow).observables.xxx.yyy`
@@ -49,18 +59,18 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
     }
     // create (id: string) => Observable
     if (ProxyPropertyType.Function$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
-      const subscribingObservable = <K extends Extract<keyof T, string>, InsideObservable extends UnpackObservable<T[K]>>(key: K, ...arguments_: unknown[]): T[K] =>
+      const subscribingObservable = <K extends Extract<keyof T, string>, InsideObservable extends UnpackObservable<T[K]>>(...arguments_: unknown[]): T[K] =>
         new Observable<InsideObservable>((subscriber: Subscriber<InsideObservable>) => {
           const serviceMethodReturnedObservable = service[getSubscriptionKey(key)](...arguments_) as (observer: Observer<InsideObservable>) => void;
           serviceMethodReturnedObservable({
             next: (value: InsideObservable) => {
               subscriber.next(value);
             },
-            error: (error: any) => {
-              subscriber.error(error);
-            },
             complete: () => {
               subscriber.complete();
+            },
+            error: (error: unknown) => {
+              subscriber.error(error);
             },
           });
         }) as T[K];
