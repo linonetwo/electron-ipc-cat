@@ -196,3 +196,13 @@ You should reject an Error, other wise `serialize-error` can't handle it well.
 - reject(errorMessage);
 + reject(new Error(errorMessage));
 ```
+
+## Change Log
+
+### V2.0.1
+
+Use ESM to enable tree shaking.
+
+### V1.3.6
+
+Fix observable's complete not triggered.

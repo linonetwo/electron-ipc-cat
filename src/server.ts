@@ -6,8 +6,8 @@
 import { IpcMain, ipcMain, IpcMainEvent, WebContents } from 'electron';
 import { isObservable, Observable, Subscription } from 'rxjs';
 import { serializeError } from 'serialize-error';
-import { ApplyRequest, ApplySubscribeRequest, GetRequest, ProxyDescriptor, Request, RequestType, ResponseType, SubscribeRequest, UnsubscribeRequest } from './common';
-import { IpcProxyError, isFunction } from './utils';
+import { ApplyRequest, ApplySubscribeRequest, GetRequest, ProxyDescriptor, Request, RequestType, ResponseType, SubscribeRequest, UnsubscribeRequest } from './common.js';
+import { IpcProxyError, isFunction } from './utils.js';
 
 // TODO: make it to be able to use @decorator, instead of write a description json. We can defer the setup of ipc handler to make this possible.
 const registrations: Record<string, ProxyServerHandler | null> = {};

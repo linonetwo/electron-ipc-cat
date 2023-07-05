@@ -8,9 +8,10 @@
  * We cannot pass Observable across contextBridge, so we have to add a hidden patch to the object on preload script, and use that patch to regenerate Observable on renderer side
  * This file is "unsafe" and will full of type warnings, which is necessary
  */
-import { Observable, type Observer, type Subscriber } from 'rxjs';
-import { IServicesWithOnlyObservables, IServicesWithoutObservables, ProxyDescriptor, ProxyPropertyType } from './common';
-import { getSubscriptionKey } from './utils';
+import type { Observer, Subscriber } from 'rxjs';
+import { Observable } from 'rxjs/internal/Observable';
+import { IServicesWithOnlyObservables, IServicesWithoutObservables, ProxyDescriptor, ProxyPropertyType } from './common.js';
+import { getSubscriptionKey } from './utils.js';
 
 interface IWindow {
   observables: IServicesWithOnlyObservables<any>;

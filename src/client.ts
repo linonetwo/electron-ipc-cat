@@ -5,8 +5,8 @@ import { Event, IpcRenderer, ipcRenderer } from 'electron';
 import memoize from 'memize';
 import { isObservable, Observable, Observer, Subscribable, TeardownLogic } from 'rxjs';
 import { deserializeError } from 'serialize-error';
-import { ProxyDescriptor, ProxyPropertyType, Request, RequestType, Response, ResponseType } from './common';
-import { getSubscriptionKey, IpcProxyError } from './utils';
+import { ProxyDescriptor, ProxyPropertyType, Request, RequestType, Response, ResponseType } from './common.js';
+import { getSubscriptionKey, IpcProxyError } from './utils.js';
 
 export type ObservableConstructor = new(subscribe: (obs: Observer<any>) => TeardownLogic) => Subscribable<any>;
 
