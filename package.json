@@ -1,6 +1,6 @@
 {
   "name": "electron-ipc-cat",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/common.js",
   "type": "module",

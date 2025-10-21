@@ -1,12 +1,14 @@
 {
   "extends": "@modern-js/tsconfig/base.json",
   "compilerOptions": {
-    "declaration": false,
+    "declaration": true,
     "jsx": "react-jsx",
     "baseUrl": "./",
     "outDir": "./dist",
     "types": ["node"],
-    "lib": ["DOM", "ESNext"]
+    "lib": ["DOM", "ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler"
   },
   "include": ["src"],
   "exclude": ["dist"]
