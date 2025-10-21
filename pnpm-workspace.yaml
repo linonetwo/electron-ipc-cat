@@ -1,0 +1,6 @@
+ignoredBuiltDependencies:
+  - electron
+
+onlyBuiltDependencies:
+  - dprint
+  - unrs-resolver

@@ -36,6 +36,10 @@
     "prepublishOnly": "npm run clean && npm run build",
     "clean": "rm -rf ./dist",
     "prepare": "npm-install-peers",
+    "update": "npm-check-updates -u && dprint config update",
+    "check": "tsc --noEmit --skipLibCheck",
+    "lint": "eslint ./src --ext js,ts,tsx,json",
+    "lint:fix": "eslint ./src --ext ts,tsx --fix",
     "installType": "typesync"
   },
   "repository": {
@@ -61,19 +65,21 @@
   ],
   "homepage": "https://github.com/linonetwo/electron-ipc-cat#readme",
   "dependencies": {
-    "memize": "^2.1.0",
-    "serialize-error": "^11.0.0",
-    "type-fest": "^2.19.0"
+    "memize": "^2.1.1",
+    "serialize-error": "^12.0.0"
   },
   "devDependencies": {
-    "@types/lodash": "^4.14.189",
-    "dprint": "^0.38.3",
-    "electron": "^25.2.0",
-    "eslint-config-tidgi": "^1.1.2",
+    "@modern-js/tsconfig": "^2.68.18",
+    "@types/lodash": "^4.17.20",
+    "dprint": "^0.50.2",
+    "electron": "^38.3.0",
+    "eslint-config-tidgi": "^2.2.0",
+    "npm-check-updates": "^19.1.1",
     "npm-install-peers": "^1.2.2",
-    "rxjs": "^7.8.1",
-    "typescript": "^4.8.4",
-    "typesync": "^0.9.2"
+    "rxjs": "^7.8.2",
+    "type-fest": "^5.1.0",
+    "typescript": "^5.9.3",
+    "typesync": "^0.14.3"
   },
   "peerDependencies": {
     "electron": ">= 13.0.0",
