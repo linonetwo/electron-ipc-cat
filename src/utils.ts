@@ -1,4 +1,4 @@
-import { errorConstructors } from 'serialize-error';
+import { addKnownErrorConstructor } from 'serialize-error';
 
 /* Custom Error */
 export class IpcProxyError extends Error {
@@ -7,7 +7,7 @@ export class IpcProxyError extends Error {
     this.name = this.constructor.name;
   }
 }
-errorConstructors.set('IpcProxyError', IpcProxyError as ErrorConstructor);
+addKnownErrorConstructor(IpcProxyError);
 
 /* Utils */
 // eslint-disable-next-line @typescript-eslint/ban-types

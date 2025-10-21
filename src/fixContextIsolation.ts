@@ -96,7 +96,7 @@ export function fixContextIsolation(): void {
 
   for (const key in services) {
     const serviceName = key as Exclude<keyof IWindow['service'], 'descriptors'>;
-    ipcProxyFixContextIsolation(serviceName, services[serviceName as string], descriptors[serviceName as number] as ProxyDescriptor);
+    ipcProxyFixContextIsolation(serviceName, services[serviceName as string], (descriptors as any)[serviceName] as ProxyDescriptor);
   }
 }
 fixContextIsolation();
