@@ -4,9 +4,10 @@
     "declaration": false,
     "jsx": "react-jsx",
     "baseUrl": "./",
+    "outDir": "./dist",
     "types": ["node"],
     "lib": ["DOM", "ESNext"]
   },
   "include": ["src"],
-  "exclude": ["./**/*.js"]
+  "exclude": ["dist"]
 }
