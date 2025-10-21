@@ -70,6 +70,7 @@
   "devDependencies": {
     "@modern-js/tsconfig": "^2.68.18",
     "@types/lodash": "^4.17.20",
+    "@types/node": "^24.7.1",
     "dprint": "^0.50.2",
     "electron": "^38.3.0",
     "eslint-config-tidgi": "^2.2.0",
