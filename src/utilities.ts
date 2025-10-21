@@ -2,7 +2,7 @@ import { addKnownErrorConstructor } from 'serialize-error';
 
 /* Custom Error */
 export class IpcProxyError extends Error {
-  constructor(message?: string | undefined) {
+  constructor(message?: string) {
     super(message);
     this.name = this.constructor.name;
   }

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -7,7 +7,7 @@ import { IpcMain, ipcMain, IpcMainEvent, WebContents } from 'electron';
 import { isObservable, Observable, Subscription } from 'rxjs';
 import { serializeError } from 'serialize-error';
 import { ApplyRequest, ApplySubscribeRequest, GetRequest, ProxyDescriptor, Request, RequestType, ResponseType, SubscribeRequest, UnsubscribeRequest } from './common.js';
-import { IpcProxyError, isFunction } from './utils.js';
+import { IpcProxyError, isFunction } from './utilities.js';
 
 // TODO: make it to be able to use @decorator, instead of write a description json. We can defer the setup of ipc handler to make this possible.
 const registrations: Record<string, ProxyServerHandler | null> = {};
@@ -42,7 +42,6 @@ export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transpo
       .handleRequest(request, sender)
       .then((result) => {
         if (sender !== undefined) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           sender.send(correlationId, { type: ResponseType.Result, result });
           sender.removeListener('destroyed', nullify);
         }

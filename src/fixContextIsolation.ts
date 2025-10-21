@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/consistent-type-assertions */
+
 /**
  * fix https://github.com/electron/electron/issues/28176
  * We cannot pass Observable across contextBridge, so we have to add a hidden patch to the object on preload script, and use that patch to regenerate Observable on renderer side
@@ -11,7 +11,7 @@
 import type { Observer, Subscriber } from 'rxjs';
 import { Observable } from 'rxjs/internal/Observable';
 import { IServicesWithOnlyObservables, IServicesWithoutObservables, ProxyDescriptor, ProxyPropertyType } from './common.js';
-import { getSubscriptionKey } from './utils.js';
+import { getSubscriptionKey } from './utilities.js';
 
 interface IWindow {
   observables: IServicesWithOnlyObservables<any>;

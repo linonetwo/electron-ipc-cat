@@ -6,7 +6,7 @@ import memoize from 'memize';
 import { isObservable, Observable, Observer, Subscribable, TeardownLogic } from 'rxjs';
 import { deserializeError } from 'serialize-error';
 import { ProxyDescriptor, ProxyPropertyType, Request, RequestType, Response, ResponseType } from './common.js';
-import { getSubscriptionKey, IpcProxyError } from './utils.js';
+import { getSubscriptionKey, IpcProxyError } from './utilities.js';
 
 export type ObservableConstructor = new(subscribe: (obs: Observer<any>) => TeardownLogic) => Subscribable<any>;
 
@@ -27,7 +27,7 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
     if (propertyType === ProxyPropertyType.Value$) {
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
-        get: memoize(() => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void) | undefined) => {
+        get: memoize(() => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void)) => {
           const ipcProxyObservable = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
           if (isObservable(ipcProxyObservable)) {
             ipcProxyObservable.subscribe(observerOrNext);
@@ -37,7 +37,7 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
     } else if (propertyType === ProxyPropertyType.Function$) {
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
-        get: memoize(() => (...arguments_: unknown[]) => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void) | undefined) => {
+        get: memoize(() => (...arguments_: unknown[]) => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void)) => {
           const ipcProxyObservableFunction = getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport);
           if (typeof ipcProxyObservableFunction === 'function') {
             const ipcProxyObservable = ipcProxyObservableFunction(...arguments_);
