@@ -1,12 +1,13 @@
 {
   "name": "electron-ipc-cat",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/common.js",
   "type": "module",
   "exports": {
     "./client": "./dist/client.js",
     "./server": "./dist/server.js",
+    "./worker": "./dist/worker.js",
     "./common": "./dist/common.js",
     "./fixContextIsolation": "./dist/fixContextIsolation.js",
     "./utils": "./dist/utils.js"
@@ -18,6 +19,9 @@
       ],
       "server": [
         "./dist/server.d.ts"
+      ],
+      "worker": [
+        "./dist/worker.d.ts"
       ],
       "fixContextIsolation": [
         "./dist/fixContextIsolation.d.ts"
@@ -42,7 +46,7 @@
     "installType": "typesync"
   },
   "repository": {
-    "type": "git",
+    "typdwe": "git",
     "url": "git+https://github.com/linonetwo/electron-ipc-cat.git"
   },
   "keywords": [

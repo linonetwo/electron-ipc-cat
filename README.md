@@ -182,6 +182,78 @@ The channel specified must be unique and match on both sides of the proxy.
 
 The packages exposes 2 entry points in the "main" and "browser" fields of package.json. "main" is for the main thread and "browser" is for the renderer thread.
 
+## Worker Thread Usage
+
+You can also use `electron-ipc-cat` to communicate between the main process and Node.js worker threads.
+
+### Worker Thread Example
+
+```typescript
+// In worker thread (worker.js)
+import { createWorkerProxy, type WorkerProxy } from 'electron-ipc-cat/worker';
+import { Observable } from 'rxjs';
+import { WorkspaceServiceIPCDescriptor, type IWorkspaceService } from './services';
+
+// Create proxy - uses the same descriptor as IPC
+const workspace = createWorkerProxy<WorkerProxy<IWorkspaceService>>(
+  WorkspaceServiceIPCDescriptor,
+  Observable
+);
+
+// Use it like local service
+const workspaces = await workspace.getWorkspacesAsList();
+workspace.get$(id).subscribe(ws => console.log(ws));
+```
+
+### Main Process - Register Worker Service
+
+```typescript
+// Main process
+import { Worker } from 'worker_threads';
+import { registerProxy, attachWorker } from 'electron-ipc-cat/server';
+import { Workspace } from './services/workspace';
+import { WorkspaceServiceIPCDescriptor } from './services';
+
+const workspaceService = new Workspace();
+
+// Register service (automatically available for both IPC and future workers)
+registerProxy(workspaceService, WorkspaceServiceIPCDescriptor);
+registerProxy(authService, AuthServiceIPCDescriptor);
+
+// Later, when you create workers (can be created anytime)
+const worker = new Worker('./worker.js');
+attachWorker(worker); // This worker can now call all registered services
+
+// Create more workers dynamically as needed
+const anotherWorker = new Worker('./another-worker.js');
+attachWorker(anotherWorker);
+```
+
+That's it! The library handles all the message routing, Observable streaming, and error handling automatically.
+
+### Custom Transport
+
+If you need custom communication logic, you can provide your own transport:
+
+```typescript
+import { createWorkerProxy, type WorkerTransport } from 'electron-ipc-cat/worker';
+
+const customTransport: WorkerTransport = {
+  postMessage: (message) => {
+    // Your custom message sending logic
+  },
+  on: (event, handler) => {
+    // Your custom message receiving logic
+  }
+};
+
+const workspace = createWorkerProxy<WorkerProxy<IWorkspaceService>>(
+  WorkspaceServiceIPCDescriptor,
+  Observable,
+  customTransport
+);
+```
+
 ## See it working
 
 [Example in TiddlyGit](https://github.com/tiddly-gittly/TiddlyGit-Desktop/blob/0c6b26c0c1113e0c66d6f49f022c5733d4fa85e8/src/preload/common/services.ts#L27-L42)
