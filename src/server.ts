@@ -7,7 +7,7 @@ import { IpcMain, ipcMain, IpcMainEvent, WebContents } from 'electron';
 import { Worker } from 'worker_threads';
 import { isObservable, Observable, Subscription } from 'rxjs';
 import { serializeError } from 'serialize-error';
-import { ApplyRequest, ApplySubscribeRequest, GetRequest, ProxyDescriptor, Request, RequestType, ResponseType, SubscribeRequest, UnsubscribeRequest } from './common.js';
+import { ApplyRequest, ApplySubscribeRequest, GetRequest, ProxyDescriptor, ProxyPropertyType, Request, RequestType, ResponseType, SubscribeRequest, UnsubscribeRequest } from './common.js';
 import { IpcProxyError, isFunction } from './utilities.js';
 import type { WorkerCallMessage, WorkerResponseMessage } from './worker.js';
 
@@ -40,6 +40,7 @@ export function registerProxy<T>(
 
   // Also register for worker access
   workerProxyHandlers.set(channel, new ProxyServerHandler(target));
+  workerProxyDescriptors.set(channel, descriptor);
 
   transport.on(channel, (event: IpcMainEvent, request: Request, correlationId: string) => {
     let sender: WebContents | undefined = event.sender;
@@ -92,6 +93,7 @@ function unregisterProxy(channel: string, transport: IpcMain): void {
   const workerHandler = workerProxyHandlers.get(channel);
   workerHandler?.unsubscribeAll();
   workerProxyHandlers.delete(channel);
+  workerProxyDescriptors.delete(channel);
 }
 
 class ProxyServerHandler {
@@ -316,6 +318,7 @@ class WorkerAdapter {
  * Registry for worker proxy handlers
  */
 const workerProxyHandlers = new Map<string, ProxyServerHandler>();
+const workerProxyDescriptors = new Map<string, ProxyDescriptor>();
 const workerMessageHandlers = new WeakMap<Worker, boolean>();
 
 /**
@@ -375,6 +378,8 @@ async function handleWorkerServiceCall(
   const { id, service: channel, method, args = [] } = message;
 
   const handler = workerProxyHandlers.get(channel);
+  const descriptor = workerProxyDescriptors.get(channel);
+  
   if (!handler) {
     worker.postMessage({
       type: 'service-response',
@@ -390,12 +395,42 @@ async function handleWorkerServiceCall(
   // Create adapter to make Worker compatible with WebContents
   const adapter = new WorkerAdapter(worker, id) as any as WebContents;
 
-  // Convert worker message to Request format
-  const request: Request = {
-    type: args.length > 0 ? RequestType.Apply : RequestType.Get,
-    propKey: method,
-    ...(args.length > 0 && { args }),
-  } as Request;
+  // Determine the correct request type based on descriptor
+  const propertyType = descriptor?.properties[method];
+  
+  let request: Request;
+  
+  if (propertyType === ProxyPropertyType.Value$) {
+    // Observable property - use Subscribe request
+    const subscriptionId = `${id}_sub`;
+    request = {
+      type: RequestType.Subscribe,
+      propKey: method,
+      subscriptionId,
+    } as SubscribeRequest;
+  } else if (propertyType === ProxyPropertyType.Function$) {
+    // Observable function - use ApplySubscribe request
+    const subscriptionId = `${id}_sub`;
+    request = {
+      type: RequestType.ApplySubscribe,
+      propKey: method,
+      subscriptionId,
+      args,
+    } as ApplySubscribeRequest;
+  } else if (propertyType === ProxyPropertyType.Value) {
+    // Regular property - use Get request
+    request = {
+      type: RequestType.Get,
+      propKey: method,
+    } as GetRequest;
+  } else {
+    // Default to Apply for functions
+    request = {
+      type: RequestType.Apply,
+      propKey: method,
+      args,
+    } as ApplyRequest;
+  }
 
   try {
     const result = await handler.handleRequest(request, adapter);

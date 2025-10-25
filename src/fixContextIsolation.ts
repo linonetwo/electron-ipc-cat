@@ -33,7 +33,7 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
 
   for (const key in descriptor.properties) {
     // Process all Observables, we pass a `.next` function from preload script, that we can used to reconstruct Observable
-    if (ProxyPropertyType.Value$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
+    if (ProxyPropertyType.Value$ === descriptor.properties[key] && getSubscriptionKey(key) in service) {
       const subscribedObservable = new Observable((subscriber: Subscriber<unknown>) => {
         const serviceMethodReturnedObservable = service[getSubscriptionKey(key)] as T[keyof T];
         // can't use `serviceMethodReturnedObservable(subscriber)` here, because `subscriber` is not serializable during contextBridge
@@ -59,7 +59,7 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
       }
     }
     // create (id: string) => Observable
-    if (ProxyPropertyType.Function$ === descriptor.properties[key] && !(key in service) && getSubscriptionKey(key) in service) {
+    if (ProxyPropertyType.Function$ === descriptor.properties[key] && getSubscriptionKey(key) in service) {
       const subscribingObservable = <K extends Extract<keyof T, string>, InsideObservable extends UnpackObservable<T[K]>>(...arguments_: unknown[]): T[K] =>
         new Observable<InsideObservable>((subscriber: Subscriber<InsideObservable>) => {
           const serviceMethodReturnedObservable = service[getSubscriptionKey(key)](...arguments_) as (observer: Observer<InsideObservable>) => void;
@@ -92,6 +92,11 @@ export function ipcProxyFixContextIsolation<T extends Record<string, any>>(name:
  * Process `(window as IWindow).service`, reconstruct Observables into `(window as IWindow).observables`
  */
 export function fixContextIsolation(): void {
+  // Only run in browser environment with window.service defined
+  if (typeof window === 'undefined' || !(window as unknown as IWindow).service) {
+    return;
+  }
+
   const { descriptors, ...services } = (window as unknown as IWindow).service;
 
   for (const key in services) {
@@ -99,4 +104,8 @@ export function fixContextIsolation(): void {
     ipcProxyFixContextIsolation(serviceName, services[serviceName as string], (descriptors as any)[serviceName] as ProxyDescriptor);
   }
 }
-fixContextIsolation();
+
+// Auto-execute in browser environment
+if (typeof window !== 'undefined') {
+  fixContextIsolation();
+}

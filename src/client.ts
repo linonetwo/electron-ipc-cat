@@ -25,6 +25,12 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
 
     // fix https://github.com/electron/electron/issues/28176
     if (propertyType === ProxyPropertyType.Value$) {
+      // Create the standard Observable property
+      Object.defineProperty(result, propertyKey, {
+        enumerable: true,
+        get: memoize(() => getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport)),
+      });
+      // Also create the Subscribe helper
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
         get: memoize(() => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void)) => {
@@ -35,6 +41,12 @@ export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: Obse
         }),
       });
     } else if (propertyType === ProxyPropertyType.Function$) {
+      // Create the standard Observable function
+      Object.defineProperty(result, propertyKey, {
+        enumerable: true,
+        get: memoize(() => getProperty(propertyType, propertyKey, descriptor.channel, ObservableCtor, transport)),
+      });
+      // Also create the Subscribe helper
       Object.defineProperty(result, getSubscriptionKey(propertyKey), {
         enumerable: true,
         get: memoize(() => (...arguments_: unknown[]) => (observerOrNext?: Partial<Observer<unknown>> | ((value: unknown) => void)) => {

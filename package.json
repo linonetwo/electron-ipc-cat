@@ -36,7 +36,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "prepublishOnly": "npm run clean && npm run build",
     "clean": "rimraf ./dist",
     "update": "npm-check-updates -u && dprint config update",
@@ -73,17 +75,22 @@
   },
   "devDependencies": {
     "@modern-js/tsconfig": "^2.68.18",
+    "@types/jsdom": "^27.0.0",
     "@types/lodash": "^4.17.20",
     "@types/node": "^24.7.1",
+    "@vitest/coverage-v8": "^4.0.3",
+    "@vitest/ui": "^4.0.3",
     "dprint": "^0.50.2",
     "electron": "^38.3.0",
     "eslint-config-tidgi": "^2.2.0",
+    "jsdom": "^27.0.1",
     "npm-check-updates": "^19.1.1",
     "rimraf": "^6.0.1",
     "rxjs": "^7.8.2",
     "type-fest": "^5.1.0",
     "typescript": "^5.9.3",
-    "typesync": "^0.14.3"
+    "typesync": "^0.14.3",
+    "vitest": "^4.0.3"
   },
   "peerDependencies": {
     "electron": ">= 13.0.0",
