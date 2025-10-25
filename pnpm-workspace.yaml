@@ -3,4 +3,5 @@ ignoredBuiltDependencies:
 
 onlyBuiltDependencies:
   - dprint
+  - esbuild
   - unrs-resolver

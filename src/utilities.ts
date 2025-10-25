@@ -7,7 +7,6 @@ export class IpcProxyError extends Error {
     this.name = this.constructor.name;
   }
 }
-addKnownErrorConstructor(IpcProxyError);
 
 /* Utils */
 // eslint-disable-next-line @typescript-eslint/ban-types

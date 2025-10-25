@@ -435,10 +435,9 @@ async function handleWorkerServiceCall(
   try {
     const result = await handler.handleRequest(request, adapter);
     
-    // If result is returned (not Observable), send it
-    if (result !== undefined) {
-      adapter.send(id, { type: ResponseType.Result, result });
-    }
+    // Always send response, even for void/undefined results
+    // This ensures the client doesn't wait forever
+    adapter.send(id, { type: ResponseType.Result, result });
   } catch (error) {
     const err = error as Error;
     adapter.send(id, { 
