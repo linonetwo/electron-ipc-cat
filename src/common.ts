@@ -1,10 +1,12 @@
 import type { Observable } from 'rxjs';
 import type { Asyncify, ConditionalKeys } from 'type-fest';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ProxyAsyncProperties<OriginalProxy> = ConditionalKeys<OriginalProxy, (..._arguments: never) => any>;
 export type ProxyObservableProperties<OriginalProxy> =
   | ConditionalKeys<OriginalProxy, Observable<unknown>>
-  | ConditionalKeys<OriginalProxy, (..._arguments: never) => Observable<unknown>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | ConditionalKeys<OriginalProxy, (..._arguments: never) => Observable<any>>;
 export type ProxyWithOnlyObservable<OriginalProxy> = Pick<OriginalProxy, ProxyObservableProperties<OriginalProxy>>;
 export type ProxyWithOutObservable<OriginalProxy> = Omit<OriginalProxy, ProxyObservableProperties<OriginalProxy>>;
 
@@ -13,6 +15,7 @@ export type ProxyWithOutObservable<OriginalProxy> = Omit<OriginalProxy, ProxyObs
  * Note this type only promisify methods that return things, not methods that returns observable.
  */
 export type AsyncifyProxy<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   OriginalProxy extends Record<string, any>,
   ObservableKey extends ProxyObservableProperties<OriginalProxy> = ProxyObservableProperties<OriginalProxy>,
   AsyncKey extends Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey> = Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey>,

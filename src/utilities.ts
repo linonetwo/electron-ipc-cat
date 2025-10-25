@@ -1,5 +1,3 @@
-import { addKnownErrorConstructor } from 'serialize-error';
-
 /* Custom Error */
 export class IpcProxyError extends Error {
   constructor(message?: string) {
@@ -9,8 +7,7 @@ export class IpcProxyError extends Error {
 }
 
 /* Utils */
-// eslint-disable-next-line @typescript-eslint/ban-types
-export function isFunction(value: unknown): value is Function {
+export function isFunction(value: unknown): value is (...arguments_: unknown[]) => unknown {
   return value !== undefined && typeof value === 'function';
 }
 

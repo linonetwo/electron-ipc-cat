@@ -3,16 +3,21 @@
  * Similar to client.ts but for Node.js worker threads
  */
 
-import { parentPort } from 'worker_threads';
 import memoize from 'memize';
 import type { Observer, Subscribable, TeardownLogic } from 'rxjs';
 import { addKnownErrorConstructor, deserializeError } from 'serialize-error';
-import { type ProxyDescriptor, ProxyPropertyType, Request, RequestType, ResponseType, type UnsubscribeRequest } from './common.js';
+import { parentPort } from 'worker_threads';
+import { type ProxyDescriptor, ProxyPropertyType, Request, RequestType, type UnsubscribeRequest } from './common.js';
 import { IpcProxyError } from './utilities.js';
 
-export type ObservableConstructor = new(subscribe: (obs: Observer<any>) => TeardownLogic) => Subscribable<any>;
+export type ObservableConstructor = new(subscribe: (obs: Observer<unknown>) => TeardownLogic) => Subscribable<unknown>;
 
-addKnownErrorConstructor(IpcProxyError);
+// Register error constructor for serialization (with error handling for duplicate registration)
+try {
+  addKnownErrorConstructor(IpcProxyError);
+} catch {
+  // Already registered
+}
 
 // Message types for worker IPC
 export interface WorkerCallMessage {
@@ -55,7 +60,9 @@ export function createDefaultWorkerTransport(): WorkerTransport {
   const port = parentPort;
 
   return {
-    postMessage: (message: WorkerCallMessage) => port.postMessage(message),
+    postMessage: (message: WorkerCallMessage) => {
+      port.postMessage(message);
+    },
     on: (event: string, handler: (message: WorkerResponseMessage) => void) => {
       if (event === 'message') {
         port.on('message', handler);
@@ -125,6 +132,8 @@ function initializeTransport(transport: WorkerTransport): void {
       } else {
         pending.next(result);
       }
+      // Handle stream completion - this is a runtime check despite type narrowing
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     } else if (type === 'service-stream-complete') {
       const pending = state.pendingStreams.get(id);
       if (!pending) return;
@@ -146,13 +155,13 @@ function makeRequest(
   transport: WorkerTransport,
 ): Promise<unknown> {
   const state = getTransportState(transport);
-  
+
   if (!state.initialized) {
     initializeTransport(transport);
   }
 
   const id = String(Math.random());
-  const propKey = 'propKey' in request ? request.propKey : 'unknown';
+  const propertyKey = 'propKey' in request ? request.propKey : 'unknown';
 
   return new Promise((resolve, reject) => {
     state.pendingCalls.set(id, { resolve, reject });
@@ -161,15 +170,15 @@ function makeRequest(
       type: 'service-call',
       id,
       service: channel,
-      method: String(propKey),
-      args: 'args' in request ? (request.args ?? []) : [],
+      method: String(propertyKey),
+      args: 'args' in request && Array.isArray(request.args) ? request.args : [],
     });
 
     // Timeout after 30 seconds
     setTimeout(() => {
       if (state.pendingCalls.has(id)) {
         state.pendingCalls.delete(id);
-        reject(new Error(`Service call timeout: ${channel}.${String(propKey)}`));
+        reject(new Error(`Service call timeout: ${channel}.${String(propertyKey)}`));
       }
     }, 30_000);
   });
@@ -183,35 +192,38 @@ function makeObservable(
   channel: string,
   ObservableCtor: ObservableConstructor,
   transport: WorkerTransport,
-): Subscribable<any> {
+): Subscribable<unknown> {
   const state = getTransportState(transport);
-  
+
   if (!state.initialized) {
     initializeTransport(transport);
   }
 
-  const propKey = 'propKey' in request ? request.propKey : 'unknown';
+  const propertyKey = 'propKey' in request ? request.propKey : 'unknown';
 
   return new ObservableCtor((observer) => {
     const subscriptionId = String(Math.random());
-    const subscriptionRequest = { ...request, subscriptionId };
+    // subscriptionRequest is used as a placeholder for future expansion
+    const _subscriptionRequest = { ...request, subscriptionId };
 
     const onComplete = () => {
       // Unsubscribe from remote
-      makeRequest({ type: RequestType.Unsubscribe, subscriptionId } as UnsubscribeRequest, channel, transport).catch((error) => {
+      makeRequest({ type: RequestType.Unsubscribe, subscriptionId } as UnsubscribeRequest, channel, transport).catch((error: unknown) => {
         console.log('Error unsubscribing from remote observable', error);
         observer.error(error);
       });
-      
+
       // Clean up local state
       state.pendingStreams.delete(subscriptionId);
-      
+
       // Remove transport listener if available
       transport.removeAllListeners?.(subscriptionId);
     };
 
     state.pendingStreams.set(subscriptionId, {
-      next: (value: unknown) => observer.next(value),
+      next: (value: unknown) => {
+        observer.next(value);
+      },
       error: (error: Error) => {
         observer.error(error);
         state.pendingStreams.delete(subscriptionId);
@@ -227,8 +239,8 @@ function makeObservable(
       type: 'service-call',
       id: subscriptionId,
       service: channel,
-      method: String(propKey),
-      args: 'args' in request ? (request.args ?? []) : [],
+      method: String(propertyKey),
+      args: 'args' in request && Array.isArray(request.args) ? request.args : [],
     });
 
     // Timeout after 30 seconds
@@ -236,7 +248,7 @@ function makeObservable(
       if (state.pendingStreams.has(subscriptionId)) {
         const pending = state.pendingStreams.get(subscriptionId);
         state.pendingStreams.delete(subscriptionId);
-        pending?.error(new Error(`Service call timeout: ${channel}.${String(propKey)}`));
+        pending?.error(new Error(`Service call timeout: ${channel}.${String(propertyKey)}`));
       }
     }, 30_000);
 
@@ -253,7 +265,7 @@ function getProperty(
   channel: string,
   ObservableCtor: ObservableConstructor,
   transport: WorkerTransport,
-): Promise<any> | Subscribable<any> | ((...arguments_: any[]) => Promise<any>) | ((...arguments_: any[]) => Subscribable<any>) {
+): Promise<unknown> | Subscribable<unknown> | ((...arguments_: unknown[]) => Promise<unknown>) | ((...arguments_: unknown[]) => Subscribable<unknown>) {
   switch (propertyType) {
     case ProxyPropertyType.Value: {
       return makeRequest({ type: RequestType.Get, propKey: propertyKey }, channel, transport);
@@ -294,6 +306,8 @@ function getProperty(
  * const workspaces = await workspace.getWorkspacesAsList();
  * workspace.get$(id).subscribe(ws => console.log(ws));
  */
+// T is used in the return type to provide proper typing for the proxy
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function createWorkerProxy<T>(
   descriptor: ProxyDescriptor,
   ObservableCtor: ObservableConstructor,

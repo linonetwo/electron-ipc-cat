@@ -8,10 +8,17 @@ import { addKnownErrorConstructor, deserializeError } from 'serialize-error';
 import { ProxyDescriptor, ProxyPropertyType, Request, RequestType, Response, ResponseType } from './common.js';
 import { getSubscriptionKey, IpcProxyError } from './utilities.js';
 
-addKnownErrorConstructor(IpcProxyError);
+// Register error constructor for serialization (with error handling for duplicate registration)
+try {
+  addKnownErrorConstructor(IpcProxyError);
+} catch {
+  // Already registered
+}
 
-export type ObservableConstructor = new(subscribe: (obs: Observer<any>) => TeardownLogic) => Subscribable<any>;
+export type ObservableConstructor = new(subscribe: (obs: Observer<unknown>) => TeardownLogic) => Subscribable<unknown>;
 
+// T is used in the return type to provide proper typing for the proxy
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function createProxy<T>(descriptor: ProxyDescriptor, ObservableCtor: ObservableConstructor = Observable, transport: IpcRenderer = ipcRenderer): T {
   const result = {};
 
@@ -78,7 +85,7 @@ function getProperty(
   channel: string,
   ObservableCtor: ObservableConstructor,
   transport: IpcRenderer,
-): Promise<any> | Subscribable<any> | ((...arguments_: any[]) => Promise<any>) | ((...arguments_: any[]) => Subscribable<any>) {
+): Promise<unknown> | Subscribable<unknown> | ((...arguments_: unknown[]) => Promise<unknown>) | ((...arguments_: unknown[]) => Subscribable<unknown>) {
   switch (propertyType) {
     case ProxyPropertyType.Value: {
       return makeRequest({ type: RequestType.Get, propKey: propertyKey }, channel, transport);
@@ -90,11 +97,10 @@ function getProperty(
       return async (...arguments_: unknown[]) => await makeRequest({ type: RequestType.Apply, propKey: propertyKey, args: arguments_ }, channel, transport);
     }
     case ProxyPropertyType.Function$: {
-      return (...arguments_: any[]) => makeObservable({ type: RequestType.ApplySubscribe, propKey: propertyKey, args: arguments_ }, channel, ObservableCtor, transport);
+      return (...arguments_: unknown[]) => makeObservable({ type: RequestType.ApplySubscribe, propKey: propertyKey, args: arguments_ }, channel, ObservableCtor, transport);
     }
     default: {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new IpcProxyError(`Unrecognised ProxyPropertyType [${propertyType}]`);
+      throw new IpcProxyError(`Unrecognised ProxyPropertyType [${propertyType as string}]`);
     }
   }
 }
@@ -104,7 +110,7 @@ async function makeRequest(request: Request, channel: string, transport: IpcRend
   transport.send(channel, request, correlationId);
 
   return await new Promise((resolve, reject) => {
-    transport.once(correlationId, (event: Event, response: Response) => {
+    transport.once(correlationId, (_event: Event, response: Response) => {
       switch (response.type) {
         case ResponseType.Result: {
           resolve(response.result);
@@ -122,20 +128,20 @@ async function makeRequest(request: Request, channel: string, transport: IpcRend
   });
 }
 
-function makeObservable(request: Request, channel: string, ObservableCtor: ObservableConstructor, transport: IpcRenderer): Subscribable<any> {
+function makeObservable(request: Request, channel: string, ObservableCtor: ObservableConstructor, transport: IpcRenderer): Subscribable<unknown> {
   return new ObservableCtor((observer) => {
     const subscriptionId = String(Math.random());
     const subscriptionRequest = { ...request, subscriptionId };
 
     const onComplete = () => {
-      makeRequest({ type: RequestType.Unsubscribe, subscriptionId }, channel, transport).catch((error) => {
+      makeRequest({ type: RequestType.Unsubscribe, subscriptionId }, channel, transport).catch((error: unknown) => {
         console.log('Error unsubscribing from remote observale', error);
         observer.error(error);
       });
       transport.removeAllListeners(subscriptionId);
     };
 
-    transport.on(subscriptionId, (event: Event, response: Response) => {
+    transport.on(subscriptionId, (_event: Event, response: Response) => {
       switch (response.type) {
         case ResponseType.Next: {
           observer.next(response.value);
@@ -155,7 +161,7 @@ function makeObservable(request: Request, channel: string, ObservableCtor: Obser
       }
     });
 
-    makeRequest(subscriptionRequest, channel, transport).catch((error: Error) => {
+    makeRequest(subscriptionRequest, channel, transport).catch((error: unknown) => {
       console.log('Error subscribing to remote observable', error);
       observer.error(error);
     });
