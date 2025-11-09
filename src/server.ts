@@ -73,27 +73,43 @@ export function registerProxy(
       .then((result) => {
         if (sender) {
           try {
-            // For undefined results, we can send them directly as they're valid in structured clone
-            // For other values, attempt to serialize to catch circular references
-            if (result !== undefined) {
-              JSON.parse(JSON.stringify(result));
-            }
+            // Try to send the result directly first
             sender.send(correlationId, { type: ResponseType.Result, result });
             sender.removeListener('destroyed', nullify);
           } catch (serializationError) {
-            // If serialization fails, convert to error response
+            // If Electron's structured clone fails, try to clean and resend
             const serializationErrorObject = serializationError as Error;
             if (logger?.error) {
-              logger.error(`E-1 IPC Serialization Error on ${channel} ${request.type} ${serializationErrorObject.message}`);
+              logger.error(`E-1 IPC Serialization Error on ${channel} ${request.type} ${serializationErrorObject.message}, attempting to clean result`);
             }
-            sender.send(correlationId, {
-              type: ResponseType.Error,
-              error: JSON.stringify(serializeError(
-                new Error(`Failed to serialize response: ${serializationErrorObject.message}`),
-                { maxDepth: 1 },
-              )),
-            });
-            sender.removeListener('destroyed', nullify);
+
+            try {
+              // Attempt to clean the result via JSON serialization
+              let cleanResult = result;
+              if (result !== undefined) {
+                cleanResult = JSON.parse(JSON.stringify(result));
+              }
+              sender.send(correlationId, { type: ResponseType.Result, result: cleanResult });
+              sender.removeListener('destroyed', nullify);
+
+              if (logger?.warning) {
+                logger.warning(`Successfully sent cleaned result for ${channel} ${request.type}`);
+              }
+            } catch (cleanupError) {
+              // If cleanup also fails, send error response
+              const cleanupErrorObject = cleanupError as Error;
+              if (logger?.error) {
+                logger.error(`E-2 Failed to clean result on ${channel} ${request.type} ${cleanupErrorObject.message}`);
+              }
+              sender.send(correlationId, {
+                type: ResponseType.Error,
+                error: JSON.stringify(serializeError(
+                  new Error(`Failed to serialize response: ${serializationErrorObject.message}`),
+                  { maxDepth: 1 },
+                )),
+              });
+              sender.removeListener('destroyed', nullify);
+            }
           }
         }
       })
@@ -247,22 +263,29 @@ class ProxyServerHandler {
     this.subscriptions[subscriptionId] = obs.subscribe({
       next: (value: unknown) => {
         try {
-          // For undefined values, we can send them directly
-          // For other values, attempt to serialize to catch circular references
-          if (value !== undefined) {
-            JSON.parse(JSON.stringify(value));
-          }
+          // Try to send the value directly first
           sender.send(subscriptionId, { type: ResponseType.Next, value });
         } catch (serializationError) {
-          // If serialization fails, send error response
+          // If Electron's structured clone fails, try to clean and resend
           const serializationErrorObject = serializationError as Error;
-          sender.send(subscriptionId, {
-            type: ResponseType.Error,
-            error: JSON.stringify(serializeError(
-              new Error(`Failed to serialize observable value: ${serializationErrorObject.message}`),
-              { maxDepth: 1 },
-            )),
-          });
+
+          try {
+            // Attempt to clean the value via JSON serialization
+            let cleanValue = value;
+            if (value !== undefined) {
+              cleanValue = JSON.parse(JSON.stringify(value));
+            }
+            sender.send(subscriptionId, { type: ResponseType.Next, value: cleanValue });
+          } catch (_cleanupError) {
+            // If cleanup also fails, send error response
+            sender.send(subscriptionId, {
+              type: ResponseType.Error,
+              error: JSON.stringify(serializeError(
+                new Error(`Failed to serialize observable value: ${serializationErrorObject.message}`),
+                { maxDepth: 1 },
+              )),
+            });
+          }
         }
       },
       error: (error: Error) => {
@@ -328,33 +351,45 @@ class WorkerAdapter {
       const responseData = data as { type: ResponseType; result?: unknown; error?: string };
       if (responseData.type === ResponseType.Result) {
         try {
-          // For undefined results, we can send them directly
-          // For other values, attempt to serialize to catch circular references
-          let resultToSend = responseData.result;
-          if (resultToSend !== undefined) {
-            resultToSend = JSON.parse(JSON.stringify(resultToSend));
-          }
+          // Try to send the result directly first
           this.worker.postMessage(
             {
               type: 'service-response',
               id: this.responseId,
-              result: resultToSend,
+              result: responseData.result,
             } satisfies WorkerResponseMessage,
           );
         } catch (serializationError) {
-          // If serialization fails, send error response
+          // If structured clone fails, try to clean and resend
           const serializationErrorObject = serializationError as Error;
-          this.worker.postMessage(
-            {
-              type: 'service-response',
-              id: this.responseId,
-              error: {
-                message: `Failed to serialize response: ${serializationErrorObject.message}`,
-                name: 'SerializationError',
-                stack: serializationErrorObject.stack,
-              },
-            } satisfies WorkerResponseMessage,
-          );
+
+          try {
+            // Attempt to clean the result via JSON serialization
+            let cleanResult = responseData.result;
+            if (cleanResult !== undefined) {
+              cleanResult = JSON.parse(JSON.stringify(cleanResult));
+            }
+            this.worker.postMessage(
+              {
+                type: 'service-response',
+                id: this.responseId,
+                result: cleanResult,
+              } satisfies WorkerResponseMessage,
+            );
+          } catch (_cleanupError) {
+            // If cleanup also fails, send error response
+            this.worker.postMessage(
+              {
+                type: 'service-response',
+                id: this.responseId,
+                error: {
+                  message: `Failed to serialize response: ${serializationErrorObject.message}`,
+                  name: 'SerializationError',
+                  stack: serializationErrorObject.stack,
+                },
+              } satisfies WorkerResponseMessage,
+            );
+          }
         }
       } else if (responseData.type === ResponseType.Error && responseData.error) {
         const errorData = JSON.parse(responseData.error) as { message: string; name?: string; stack?: string };
@@ -375,33 +410,45 @@ class WorkerAdapter {
       const streamData = data as { type: ResponseType; value?: unknown; error?: string };
       if (streamData.type === ResponseType.Next) {
         try {
-          // For undefined values, we can send them directly
-          // For other values, attempt to serialize to catch circular references
-          let valueToSend = streamData.value;
-          if (valueToSend !== undefined) {
-            valueToSend = JSON.parse(JSON.stringify(valueToSend));
-          }
+          // Try to send the value directly first
           this.worker.postMessage(
             {
               type: 'service-stream',
               id: this.responseId,
-              result: valueToSend,
+              result: streamData.value,
             } satisfies WorkerResponseMessage,
           );
         } catch (serializationError) {
-          // If serialization fails, send error response
+          // If structured clone fails, try to clean and resend
           const serializationErrorObject = serializationError as Error;
-          this.worker.postMessage(
-            {
-              type: 'service-stream',
-              id: this.responseId,
-              error: {
-                message: `Failed to serialize observable value: ${serializationErrorObject.message}`,
-                name: 'SerializationError',
-                stack: serializationErrorObject.stack,
-              },
-            } satisfies WorkerResponseMessage,
-          );
+
+          try {
+            // Attempt to clean the value via JSON serialization
+            let cleanValue = streamData.value;
+            if (cleanValue !== undefined) {
+              cleanValue = JSON.parse(JSON.stringify(cleanValue));
+            }
+            this.worker.postMessage(
+              {
+                type: 'service-stream',
+                id: this.responseId,
+                result: cleanValue,
+              } satisfies WorkerResponseMessage,
+            );
+          } catch (_cleanupError) {
+            // If cleanup also fails, send error response
+            this.worker.postMessage(
+              {
+                type: 'service-stream',
+                id: this.responseId,
+                error: {
+                  message: `Failed to serialize observable value: ${serializationErrorObject.message}`,
+                  name: 'SerializationError',
+                  stack: serializationErrorObject.stack,
+                },
+              } satisfies WorkerResponseMessage,
+            );
+          }
         }
       } else if (streamData.type === ResponseType.Error && streamData.error) {
         const errorData = JSON.parse(streamData.error) as { message: string; name?: string; stack?: string };
