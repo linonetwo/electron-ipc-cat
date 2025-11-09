@@ -72,8 +72,29 @@ export function registerProxy(
       .handleRequest(request, sender)
       .then((result) => {
         if (sender) {
-          sender.send(correlationId, { type: ResponseType.Result, result });
-          sender.removeListener('destroyed', nullify);
+          try {
+            // For undefined results, we can send them directly as they're valid in structured clone
+            // For other values, attempt to serialize to catch circular references
+            if (result !== undefined) {
+              JSON.parse(JSON.stringify(result));
+            }
+            sender.send(correlationId, { type: ResponseType.Result, result });
+            sender.removeListener('destroyed', nullify);
+          } catch (serializationError) {
+            // If serialization fails, convert to error response
+            const serializationErrorObject = serializationError as Error;
+            if (logger?.error) {
+              logger.error(`E-1 IPC Serialization Error on ${channel} ${request.type} ${serializationErrorObject.message}`);
+            }
+            sender.send(correlationId, {
+              type: ResponseType.Error,
+              error: JSON.stringify(serializeError(
+                new Error(`Failed to serialize response: ${serializationErrorObject.message}`),
+                { maxDepth: 1 },
+              )),
+            });
+            sender.removeListener('destroyed', nullify);
+          }
         }
       })
       .catch((error: unknown) => {
@@ -225,7 +246,24 @@ class ProxyServerHandler {
 
     this.subscriptions[subscriptionId] = obs.subscribe({
       next: (value: unknown) => {
-        sender.send(subscriptionId, { type: ResponseType.Next, value });
+        try {
+          // For undefined values, we can send them directly
+          // For other values, attempt to serialize to catch circular references
+          if (value !== undefined) {
+            JSON.parse(JSON.stringify(value));
+          }
+          sender.send(subscriptionId, { type: ResponseType.Next, value });
+        } catch (serializationError) {
+          // If serialization fails, send error response
+          const serializationErrorObject = serializationError as Error;
+          sender.send(subscriptionId, {
+            type: ResponseType.Error,
+            error: JSON.stringify(serializeError(
+              new Error(`Failed to serialize observable value: ${serializationErrorObject.message}`),
+              { maxDepth: 1 },
+            )),
+          });
+        }
       },
       error: (error: Error) => {
         sender.send(subscriptionId, { type: ResponseType.Error, error: JSON.stringify(serializeError(error, { maxDepth: 1 })) });
@@ -289,13 +327,35 @@ class WorkerAdapter {
       // Regular response
       const responseData = data as { type: ResponseType; result?: unknown; error?: string };
       if (responseData.type === ResponseType.Result) {
-        this.worker.postMessage(
-          {
-            type: 'service-response',
-            id: this.responseId,
-            result: responseData.result,
-          } satisfies WorkerResponseMessage,
-        );
+        try {
+          // For undefined results, we can send them directly
+          // For other values, attempt to serialize to catch circular references
+          let resultToSend = responseData.result;
+          if (resultToSend !== undefined) {
+            resultToSend = JSON.parse(JSON.stringify(resultToSend));
+          }
+          this.worker.postMessage(
+            {
+              type: 'service-response',
+              id: this.responseId,
+              result: resultToSend,
+            } satisfies WorkerResponseMessage,
+          );
+        } catch (serializationError) {
+          // If serialization fails, send error response
+          const serializationErrorObject = serializationError as Error;
+          this.worker.postMessage(
+            {
+              type: 'service-response',
+              id: this.responseId,
+              error: {
+                message: `Failed to serialize response: ${serializationErrorObject.message}`,
+                name: 'SerializationError',
+                stack: serializationErrorObject.stack,
+              },
+            } satisfies WorkerResponseMessage,
+          );
+        }
       } else if (responseData.type === ResponseType.Error && responseData.error) {
         const errorData = JSON.parse(responseData.error) as { message: string; name?: string; stack?: string };
         this.worker.postMessage(
@@ -314,13 +374,35 @@ class WorkerAdapter {
       // Subscription response (channel is subscriptionId)
       const streamData = data as { type: ResponseType; value?: unknown; error?: string };
       if (streamData.type === ResponseType.Next) {
-        this.worker.postMessage(
-          {
-            type: 'service-stream',
-            id: this.responseId,
-            result: streamData.value,
-          } satisfies WorkerResponseMessage,
-        );
+        try {
+          // For undefined values, we can send them directly
+          // For other values, attempt to serialize to catch circular references
+          let valueToSend = streamData.value;
+          if (valueToSend !== undefined) {
+            valueToSend = JSON.parse(JSON.stringify(valueToSend));
+          }
+          this.worker.postMessage(
+            {
+              type: 'service-stream',
+              id: this.responseId,
+              result: valueToSend,
+            } satisfies WorkerResponseMessage,
+          );
+        } catch (serializationError) {
+          // If serialization fails, send error response
+          const serializationErrorObject = serializationError as Error;
+          this.worker.postMessage(
+            {
+              type: 'service-stream',
+              id: this.responseId,
+              error: {
+                message: `Failed to serialize observable value: ${serializationErrorObject.message}`,
+                name: 'SerializationError',
+                stack: serializationErrorObject.stack,
+              },
+            } satisfies WorkerResponseMessage,
+          );
+        }
       } else if (streamData.type === ResponseType.Error && streamData.error) {
         const errorData = JSON.parse(streamData.error) as { message: string; name?: string; stack?: string };
         this.worker.postMessage(
