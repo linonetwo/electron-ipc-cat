@@ -364,8 +364,8 @@ describe('Worker Proxy - Observable', () => {
         },
       });
 
-      // Fast-forward time beyond 30 seconds timeout
-      vi.advanceTimersByTime(31000);
+      // Fast-forward time beyond 120 seconds initial timeout
+      vi.advanceTimersByTime(121_000);
     });
 
     await errorPromise;
@@ -416,6 +416,7 @@ describe('Worker Proxy - Observable', () => {
   });
 
   it('should handle custom transport', async () => {
+    vi.useRealTimers();
     const customMessages: any[] = [];
     const customEmitter = new EventEmitter();
 

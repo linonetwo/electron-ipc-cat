@@ -220,21 +220,53 @@ function makeObservable(
       });
 
       // Clean up local state
+      clearStreamTimeout();
       state.pendingStreams.delete(subscriptionId);
 
       // Remove transport listener if available
       transport.removeAllListeners?.(subscriptionId);
     };
 
+    // Rolling timeout: resets every time data arrives so long-running
+    // streams (e.g. git-upload-pack for large repos) aren't killed while
+    // still actively producing data.  Initial grace period is generous
+    // (120 s) because the server may need time to pack objects; subsequent
+    // resets use a shorter idle window (60 s).
+    const INITIAL_TIMEOUT_MS = 120_000;
+    const IDLE_TIMEOUT_MS = 60_000;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    const clearStreamTimeout = () => {
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = undefined;
+      }
+    };
+
+    const resetStreamTimeout = (ms: number) => {
+      clearStreamTimeout();
+      timeoutHandle = setTimeout(() => {
+        if (state.pendingStreams.has(subscriptionId)) {
+          const pending = state.pendingStreams.get(subscriptionId);
+          state.pendingStreams.delete(subscriptionId);
+          pending?.error(new Error(`Service call timeout: ${channel}.${String(propertyKey)}`));
+        }
+      }, ms);
+    };
+
     state.pendingStreams.set(subscriptionId, {
       next: (value: unknown) => {
+        // Data arrived — reset the idle timeout.
+        resetStreamTimeout(IDLE_TIMEOUT_MS);
         observer.next(value);
       },
       error: (error: Error) => {
+        clearStreamTimeout();
         observer.error(error);
         state.pendingStreams.delete(subscriptionId);
       },
       complete: () => {
+        clearStreamTimeout();
         observer.complete();
         state.pendingStreams.delete(subscriptionId);
       },
@@ -251,14 +283,8 @@ function makeObservable(
       subscriptionId,
     });
 
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      if (state.pendingStreams.has(subscriptionId)) {
-        const pending = state.pendingStreams.get(subscriptionId);
-        state.pendingStreams.delete(subscriptionId);
-        pending?.error(new Error(`Service call timeout: ${channel}.${String(propertyKey)}`));
-      }
-    }, 30_000);
+    // Start the initial timeout (longer to allow server-side packing).
+    resetStreamTimeout(INITIAL_TIMEOUT_MS);
 
     return onComplete;
   });
