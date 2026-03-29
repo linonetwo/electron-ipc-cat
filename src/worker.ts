@@ -26,6 +26,8 @@ export interface WorkerCallMessage {
   service: string;
   method: string;
   args: unknown[];
+  requestType?: RequestType;
+  subscriptionId?: string;
 }
 
 export interface WorkerResponseMessage {
@@ -161,7 +163,9 @@ function makeRequest(
   }
 
   const id = String(Math.random());
-  const propertyKey = 'propKey' in request ? request.propKey : 'unknown';
+  const propertyKey = 'propKey' in request ? request.propKey : '';
+  const requestType = request.type === 'unknown' ? undefined : request.type;
+  const subscriptionId = 'subscriptionId' in request ? request.subscriptionId : undefined;
 
   return new Promise((resolve, reject) => {
     state.pendingCalls.set(id, { resolve, reject });
@@ -172,6 +176,8 @@ function makeRequest(
       service: channel,
       method: String(propertyKey),
       args: 'args' in request && Array.isArray(request.args) ? request.args : [],
+      requestType,
+      subscriptionId,
     });
 
     // Timeout after 30 seconds
@@ -241,6 +247,8 @@ function makeObservable(
       service: channel,
       method: String(propertyKey),
       args: 'args' in request && Array.isArray(request.args) ? request.args : [],
+      requestType: request.type === 'unknown' ? undefined : request.type,
+      subscriptionId,
     });
 
     // Timeout after 30 seconds

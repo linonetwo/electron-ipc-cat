@@ -276,7 +276,7 @@ class ProxyServerHandler {
               cleanValue = JSON.parse(JSON.stringify(value));
             }
             sender.send(subscriptionId, { type: ResponseType.Next, value: cleanValue });
-          } catch (_cleanupError) {
+          } catch {
             // If cleanup also fails, send error response
             sender.send(subscriptionId, {
               type: ResponseType.Error,
@@ -376,7 +376,7 @@ class WorkerAdapter {
                 result: cleanResult,
               } satisfies WorkerResponseMessage,
             );
-          } catch (_cleanupError) {
+          } catch {
             // If cleanup also fails, send error response
             this.worker.postMessage(
               {
@@ -435,7 +435,7 @@ class WorkerAdapter {
                 result: cleanValue,
               } satisfies WorkerResponseMessage,
             );
-          } catch (_cleanupError) {
+          } catch {
             // If cleanup also fails, send error response
             this.worker.postMessage(
               {
@@ -549,7 +549,7 @@ async function handleWorkerServiceCall(
   worker: Worker,
   message: WorkerCallMessage,
 ): Promise<void> {
-  const { id, service: channel, method, args: arguments_ = [] } = message;
+  const { id, service: channel, method, args: arguments_ = [], requestType, subscriptionId } = message;
 
   const handler = workerProxyHandlers.get(channel);
   const descriptor = workerProxyDescriptors.get(channel);
@@ -572,41 +572,67 @@ async function handleWorkerServiceCall(
   // We use type assertion here because WorkerAdapter implements the subset of WebContents we need
   const adapter = new WorkerAdapter(worker, id) as unknown as WebContents;
 
-  // Determine the correct request type based on descriptor
-  const propertyType = descriptor?.properties[method];
-
   let request: Request;
 
-  if (propertyType === ProxyPropertyType.Value$) {
-    // Observable property - use Subscribe request
-    const subscriptionId = `${id}_sub`;
+  if (requestType === RequestType.Unsubscribe) {
+    const normalizedSubscriptionId = subscriptionId ?? id;
+    request = {
+      type: RequestType.Unsubscribe,
+      subscriptionId: `${normalizedSubscriptionId}_sub`,
+    } as UnsubscribeRequest;
+  } else if (requestType === RequestType.Subscribe) {
     request = {
       type: RequestType.Subscribe,
       propKey: method,
-      subscriptionId,
+      subscriptionId: `${id}_sub`,
     } as SubscribeRequest;
-  } else if (propertyType === ProxyPropertyType.Function$) {
-    // Observable function - use ApplySubscribe request
-    const subscriptionId = `${id}_sub`;
+  } else if (requestType === RequestType.ApplySubscribe) {
     request = {
       type: RequestType.ApplySubscribe,
       propKey: method,
-      subscriptionId,
+      subscriptionId: `${id}_sub`,
       args: arguments_,
     } as ApplySubscribeRequest;
-  } else if (propertyType === ProxyPropertyType.Value) {
-    // Regular property - use Get request
+  } else if (requestType === RequestType.Get) {
     request = {
       type: RequestType.Get,
       propKey: method,
     } as GetRequest;
-  } else {
-    // Default to Apply for functions
+  } else if (requestType === RequestType.Apply) {
     request = {
       type: RequestType.Apply,
       propKey: method,
       args: arguments_,
     } as ApplyRequest;
+  } else {
+    // Determine the correct request type based on descriptor as fallback
+    const propertyType = descriptor?.properties[method];
+
+    if (propertyType === ProxyPropertyType.Value$) {
+      request = {
+        type: RequestType.Subscribe,
+        propKey: method,
+        subscriptionId: `${id}_sub`,
+      } as SubscribeRequest;
+    } else if (propertyType === ProxyPropertyType.Function$) {
+      request = {
+        type: RequestType.ApplySubscribe,
+        propKey: method,
+        subscriptionId: `${id}_sub`,
+        args: arguments_,
+      } as ApplySubscribeRequest;
+    } else if (propertyType === ProxyPropertyType.Value) {
+      request = {
+        type: RequestType.Get,
+        propKey: method,
+      } as GetRequest;
+    } else {
+      request = {
+        type: RequestType.Apply,
+        propKey: method,
+        args: arguments_,
+      } as ApplyRequest;
+    }
   }
 
   try {

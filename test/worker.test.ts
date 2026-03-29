@@ -131,6 +131,35 @@ describe('Worker Proxy - Function Calls', () => {
 });
 
 describe('Worker Proxy - Observable', () => {
+  it('should include requestType and subscriptionId when unsubscribing', async () => {
+    const descriptor = {
+      channel: 'UnsubscribeChannel',
+      properties: {
+        data$: ProxyPropertyType.Value$,
+      },
+    };
+
+    const proxy = createWorkerProxy<any>(descriptor, Observable);
+
+    const subscription = proxy.data$.subscribe({
+      next: () => {},
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    const subscribeMessage = mockParentPort.sentMessages[0];
+    expect(subscribeMessage.requestType).toBe('subscribe');
+    expect(subscribeMessage.subscriptionId).toBe(subscribeMessage.id);
+
+    subscription.unsubscribe();
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    const unsubscribeMessage = mockParentPort.sentMessages[1];
+    expect(unsubscribeMessage.requestType).toBe('unsubscribe');
+    expect(unsubscribeMessage.subscriptionId).toBe(subscribeMessage.id);
+  });
+
   it('should subscribe to observable', async () => {
     const descriptor = {
       channel: 'ObsChannel',

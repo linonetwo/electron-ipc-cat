@@ -171,6 +171,72 @@ describe('WorkerAdapter - Observable Stream Responses', () => {
     mockIpcMain.handlers.clear();
   });
 
+  it('should handle worker unsubscribe request without applying unknown method', async () => {
+    const subject = new Subject<number>();
+    const service = {
+      stream$: subject,
+    };
+
+    const descriptor = {
+      channel: 'StreamUnsubscribeChannel',
+      properties: {
+        stream$: ProxyPropertyType.Value$,
+      },
+    };
+
+    const cleanup = registerProxy(service, descriptor, mockIpcMain as any);
+
+    const workerEmitter = new EventEmitter();
+    const messages: any[] = [];
+    const mockWorker = {
+      on: vi.fn((event: string, handler: (...args: any[]) => void) => {
+        workerEmitter.on(event, handler);
+      }),
+      once: vi.fn((event: string, handler: (...args: any[]) => void) => {
+        workerEmitter.once(event, handler);
+      }),
+      removeListener: vi.fn(),
+      postMessage: vi.fn((msg: any) => {
+        messages.push(msg);
+      }),
+    } as any as Worker;
+
+    const workerCleanup = attachWorker(mockWorker);
+
+    workerEmitter.emit('message', {
+      type: 'service-call',
+      id: 'worker-unsub-1',
+      service: 'StreamUnsubscribeChannel',
+      method: 'stream$',
+      args: [],
+      requestType: 'subscribe',
+      subscriptionId: 'worker-unsub-1',
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 30));
+
+    subject.next(1);
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    workerEmitter.emit('message', {
+      type: 'service-call',
+      id: 'worker-unsub-cleanup-1',
+      service: 'StreamUnsubscribeChannel',
+      method: '',
+      args: [],
+      requestType: 'unsubscribe',
+      subscriptionId: 'worker-unsub-1',
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 30));
+
+    const errorResponses = messages.filter((message) => message.type === 'service-response' && message.error);
+    expect(errorResponses).toHaveLength(0);
+
+    workerCleanup();
+    cleanup();
+  });
+
   it('should send Next stream response to worker', async () => {
     const subject = new Subject<number>();
     const service = {
