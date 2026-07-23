@@ -9,6 +9,7 @@ import {
   ApplyRequest,
   ApplySubscribeRequest,
   GetRequest,
+  type MessagePeer,
   ProxyDescriptor,
   ProxyPropertyType,
   Request,
@@ -331,16 +332,18 @@ class ProxyServerHandler {
 }
 
 /* ============================================================================
- * Worker Thread Support
+ * Peer (Worker Thread / UtilityProcess) Support
  * ============================================================================ */
 
 /**
- * Adapter to make Worker compatible with WebContents interface
- * This allows us to reuse ProxyServerHandler for worker threads
+ * Adapter to make a MessagePeer (Worker or UtilityProcess) compatible with
+ * the WebContents interface expected by ProxyServerHandler.
+ * This allows us to reuse ProxyServerHandler for both worker threads and
+ * utility processes without duplication.
  */
-class WorkerAdapter {
+class PeerAdapter {
   constructor(
-    private readonly worker: Worker,
+    private readonly peer: MessagePeer,
     private readonly responseId: string,
   ) {}
 
@@ -352,7 +355,7 @@ class WorkerAdapter {
       if (responseData.type === ResponseType.Result) {
         try {
           // Try to send the result directly first
-          this.worker.postMessage(
+          this.peer.postMessage(
             {
               type: 'service-response',
               id: this.responseId,
@@ -369,7 +372,7 @@ class WorkerAdapter {
             if (cleanResult !== undefined) {
               cleanResult = JSON.parse(JSON.stringify(cleanResult));
             }
-            this.worker.postMessage(
+            this.peer.postMessage(
               {
                 type: 'service-response',
                 id: this.responseId,
@@ -378,7 +381,7 @@ class WorkerAdapter {
             );
           } catch {
             // If cleanup also fails, send error response
-            this.worker.postMessage(
+            this.peer.postMessage(
               {
                 type: 'service-response',
                 id: this.responseId,
@@ -393,7 +396,7 @@ class WorkerAdapter {
         }
       } else if (responseData.type === ResponseType.Error && responseData.error) {
         const errorData = JSON.parse(responseData.error) as { message: string; name?: string; stack?: string };
-        this.worker.postMessage(
+        this.peer.postMessage(
           {
             type: 'service-response',
             id: this.responseId,
@@ -411,7 +414,7 @@ class WorkerAdapter {
       if (streamData.type === ResponseType.Next) {
         try {
           // Try to send the value directly first
-          this.worker.postMessage(
+          this.peer.postMessage(
             {
               type: 'service-stream',
               id: this.responseId,
@@ -428,7 +431,7 @@ class WorkerAdapter {
             if (cleanValue !== undefined) {
               cleanValue = JSON.parse(JSON.stringify(cleanValue));
             }
-            this.worker.postMessage(
+            this.peer.postMessage(
               {
                 type: 'service-stream',
                 id: this.responseId,
@@ -437,7 +440,7 @@ class WorkerAdapter {
             );
           } catch {
             // If cleanup also fails, send error response
-            this.worker.postMessage(
+            this.peer.postMessage(
               {
                 type: 'service-stream',
                 id: this.responseId,
@@ -452,7 +455,7 @@ class WorkerAdapter {
         }
       } else if (streamData.type === ResponseType.Error && streamData.error) {
         const errorData = JSON.parse(streamData.error) as { message: string; name?: string; stack?: string };
-        this.worker.postMessage(
+        this.peer.postMessage(
           {
             type: 'service-stream',
             id: this.responseId,
@@ -464,7 +467,7 @@ class WorkerAdapter {
           } satisfies WorkerResponseMessage,
         );
       } else if (streamData.type === ResponseType.Complete) {
-        this.worker.postMessage(
+        this.peer.postMessage(
           {
             type: 'service-stream-complete',
             id: this.responseId,
@@ -477,28 +480,69 @@ class WorkerAdapter {
   // Stub implementations for WebContents interface
   once(event: string, listener: () => void): void {
     if (event === 'destroyed') {
-      this.worker.once('exit', listener);
+      this.peer.once('exit', listener);
     }
-    // devtools-reload-page doesn't apply to workers
+    // devtools-reload-page doesn't apply to peers
   }
 
   removeListener(event: string, listener: () => void): void {
     if (event === 'destroyed') {
-      this.worker.removeListener('exit', listener);
+      this.peer.removeListener('exit', listener);
     }
   }
 }
 
 /**
- * Registry for worker proxy handlers
+ * Registry for peer proxy handlers (shared by Worker threads and UtilityProcess)
  */
 const workerProxyHandlers = new Map<string, ProxyServerHandler>();
 const workerProxyDescriptors = new Map<string, ProxyDescriptor>();
-const workerMessageHandlers = new WeakMap<Worker, boolean>();
+const peerMessageHandlers = new WeakMap<MessagePeer, boolean>();
 
 /**
- * Attach a worker to existing registered services
- * Allows dynamically created workers to access all registered services
+ * Attach a message peer (Worker thread or UtilityProcess) to existing
+ * registered services. Allows dynamically created peers to access all
+ * registered services.
+ *
+ * This is the core implementation; `attachWorker` and `attachUtilityProcess`
+ * are thin typed wrappers around this function.
+ *
+ * @param peer A MessagePeer (Worker or UtilityProcess) to attach
+ * @returns Cleanup function
+ */
+export function attachPeer(peer: MessagePeer): VoidFunction {
+  // Set up message listener if not already set
+  if (peerMessageHandlers.has(peer)) {
+    // Already attached
+    return () => {};
+  }
+
+  peerMessageHandlers.set(peer, true);
+
+  const messageHandler = async (message: unknown): Promise<void> => {
+    if (typeof message === 'object' && message !== null && 'type' in message) {
+      const typedMessage = message as WorkerCallMessage;
+      // Handle service call messages from peer
+      await handlePeerServiceCall(peer, typedMessage);
+    }
+  };
+
+  peer.on('message', messageHandler);
+
+  // Cleanup on peer exit
+  peer.once('exit', () => {
+    peerMessageHandlers.delete(peer);
+  });
+
+  return () => {
+    peerMessageHandlers.delete(peer);
+    peer.removeListener('message', messageHandler);
+  };
+}
+
+/**
+ * Attach a Worker thread to existing registered services.
+ * Thin wrapper around `attachPeer` — a `Worker` satisfies `MessagePeer`.
  *
  * @param worker Worker instance to attach
  * @returns Cleanup function
@@ -506,47 +550,48 @@ const workerMessageHandlers = new WeakMap<Worker, boolean>();
  * @example
  * // First, register services
  * registerProxy(workspaceService, WorkspaceServiceIPCDescriptor);
- * registerProxy(authService, AuthServiceIPCDescriptor);
  *
  * // Later, when creating a new worker dynamically
  * const newWorker = new Worker('./worker.js');
  * attachWorker(newWorker);
  */
 export function attachWorker(worker: Worker): VoidFunction {
-  // Set up message listener if not already set
-  if (workerMessageHandlers.has(worker)) {
-    // Already attached
-    return () => {};
-  }
-
-  workerMessageHandlers.set(worker, true);
-
-  const messageHandler = async (message: unknown): Promise<void> => {
-    if (typeof message === 'object' && message !== null && 'type' in message) {
-      const typedMessage = message as WorkerCallMessage;
-      // Handle service call messages from worker
-      await handleWorkerServiceCall(worker, typedMessage);
-    }
-  };
-
-  worker.on('message', messageHandler);
-
-  // Cleanup on worker exit
-  worker.once('exit', () => {
-    workerMessageHandlers.delete(worker);
-  });
-
-  return () => {
-    workerMessageHandlers.delete(worker);
-    worker.removeListener('message', messageHandler);
-  };
+  return attachPeer(worker);
 }
 
 /**
- * Handle service call from worker using ProxyServerHandler
+ * Attach an Electron UtilityProcess to existing registered services.
+ * Thin wrapper around `attachPeer` — a `UtilityProcess` satisfies `MessagePeer`.
+ *
+ * UtilityProcess provides true process-level crash isolation (unlike Worker
+ * threads which share the process address space). When the utility process
+ * crashes, the main process survives and can restart it.
+ *
+ * @param child UtilityProcess instance to attach
+ * @returns Cleanup function
+ *
+ * @example
+ * import { utilityProcess } from 'electron';
+ *
+ * registerProxy(workspaceService, WorkspaceServiceIPCDescriptor);
+ *
+ * const child = utilityProcess.fork('./utilityWorker.js');
+ * attachUtilityProcess(child);
+ *
+ * // Auto-restart on crash
+ * child.on('exit', (code) => {
+ *   if (code !== 0) { restartUtilityProcess(); }
+ * });
  */
-async function handleWorkerServiceCall(
-  worker: Worker,
+export function attachUtilityProcess(child: MessagePeer): VoidFunction {
+  return attachPeer(child);
+}
+
+/**
+ * Handle service call from a peer using ProxyServerHandler
+ */
+async function handlePeerServiceCall(
+  peer: MessagePeer,
   message: WorkerCallMessage,
 ): Promise<void> {
   const { id, service: channel, method, args: arguments_ = [], requestType, subscriptionId } = message;
@@ -555,7 +600,7 @@ async function handleWorkerServiceCall(
   const descriptor = workerProxyDescriptors.get(channel);
 
   if (!handler) {
-    worker.postMessage(
+    peer.postMessage(
       {
         type: 'service-response',
         id,
@@ -568,9 +613,9 @@ async function handleWorkerServiceCall(
     return;
   }
 
-  // Create adapter to make Worker compatible with WebContents
-  // We use type assertion here because WorkerAdapter implements the subset of WebContents we need
-  const adapter = new WorkerAdapter(worker, id) as unknown as WebContents;
+  // Create adapter to make peer compatible with WebContents
+  // We use type assertion here because PeerAdapter implements the subset of WebContents we need
+  const adapter = new PeerAdapter(peer, id) as unknown as WebContents;
 
   let request: Request;
 
@@ -650,4 +695,4 @@ async function handleWorkerServiceCall(
   }
 }
 
-export type { ProxyDescriptor, ProxyPropertyType } from './common';
+export type { ProxyDescriptor, ProxyPropertyType, MessagePeer } from './common';

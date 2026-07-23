@@ -461,3 +461,81 @@ describe('Worker Proxy - Observable', () => {
   });
 });
 
+/**
+ * UtilityProcess transport tests
+ * Verifies the createDefaultUtilityProcessTransport unwraps { data, ports } events
+ */
+describe('createDefaultUtilityProcessTransport', () => {
+  it('should throw when process.parentPort is not available', async () => {
+    vi.resetModules();
+    vi.doMock('worker_threads', () => ({ parentPort: null }));
+
+    const originalParentPort = (process as { parentPort?: unknown }).parentPort;
+    delete (process as { parentPort?: unknown }).parentPort;
+
+    const { createDefaultUtilityProcessTransport } = await import('../src/worker.js');
+
+    expect(() => {
+      createDefaultUtilityProcessTransport();
+    }).toThrow('process.parentPort is not available');
+
+    if (originalParentPort !== undefined) {
+      (process as { parentPort?: unknown }).parentPort = originalParentPort;
+    }
+  });
+
+  it('should unwrap { data } from message events (unlike worker_threads raw messages)', async () => {
+    vi.useRealTimers();
+    const sentMessages: any[] = [];
+    const mockPort = new EventEmitter();
+    mockPort.postMessage = (msg: any) => { sentMessages.push(msg); };
+
+    // Temporarily set process.parentPort
+    const originalParentPort = (process as { parentPort?: unknown }).parentPort;
+    (process as { parentPort?: unknown }).parentPort = mockPort;
+
+    const { createDefaultUtilityProcessTransport } = await import('../src/worker.js');
+    const transport = createDefaultUtilityProcessTransport();
+
+    const descriptor = {
+      channel: 'UtilityChannel',
+      properties: {
+        test: ProxyPropertyType.Function,
+      },
+    };
+
+    const proxy = createWorkerProxy<any>(descriptor, Observable, transport);
+    const promise = proxy.test('arg1');
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(sentMessages.length).toBeGreaterThan(0);
+    expect(sentMessages[0]).toMatchObject({
+      type: 'service-call',
+      service: 'UtilityChannel',
+      method: 'test',
+      args: ['arg1'],
+    });
+
+    // Utility process wraps the message in { data, ports }
+    mockPort.emit('message', {
+      data: {
+        type: 'service-response',
+        id: sentMessages[0].id,
+        result: 'utility-result',
+      },
+      ports: [],
+    });
+
+    const result = await promise;
+    expect(result).toBe('utility-result');
+
+    // Restore
+    if (originalParentPort === undefined) {
+      delete (process as { parentPort?: unknown }).parentPort;
+    } else {
+      (process as { parentPort?: unknown }).parentPort = originalParentPort;
+    }
+  });
+});
+

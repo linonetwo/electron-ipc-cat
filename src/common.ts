@@ -120,3 +120,20 @@ export interface CompleteResponse {
 }
 
 export type Response = ResultResponse | ErrorResponse | NextResponse | CompleteResponse;
+
+/* ============================================================================
+ * Message Peer Interface
+ * Abstracts the communication peer so that both Node.js Worker threads and
+ * Electron UtilityProcess can be used interchangeably on the main-process
+ * side. Both satisfy this structural interface.
+ * ============================================================================ */
+export interface MessagePeer {
+  /** Send a message to the peer (structured-clone serialized). */
+  postMessage(message: unknown): void;
+  /** Listen for messages arriving from the peer. */
+  on(event: 'message', handler: (message: unknown) => void): void;
+  /** Listen for the peer process/thread exiting. */
+  on(event: 'exit', handler: (code: number) => void): void;
+  once(event: 'exit', handler: (code: number) => void): void;
+  removeListener(event: string, handler: (...args: unknown[]) => void): void;
+}

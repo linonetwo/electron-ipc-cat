@@ -254,6 +254,61 @@ const workspace = createWorkerProxy<WorkerProxy<IWorkspaceService>>(
 );
 ```
 
+## UtilityProcess Usage (Electron)
+
+Electron's `utilityProcess` provides **true process-level crash isolation** — unlike worker threads which share the process address space, a utility process crash won't take down the main process. This is the same approach VS Code uses for its extension host.
+
+### UtilityProcess Example
+
+```typescript
+// In utility process child (utilityWorker.js)
+import { createWorkerProxy, createDefaultUtilityProcessTransport, type WorkerProxy } from 'electron-ipc-cat/worker';
+import { Observable } from 'rxjs';
+
+// Use the utility-process-aware transport (unwraps { data, ports } events)
+const transport = createDefaultUtilityProcessTransport();
+const workspace = createWorkerProxy<WorkerProxy<IWorkspaceService>>(
+  WorkspaceServiceIPCDescriptor,
+  Observable,
+  transport
+);
+
+const workspaces = await workspace.getWorkspacesAsList();
+```
+
+### Main Process - Attach UtilityProcess
+
+```typescript
+// Main process
+import { utilityProcess } from 'electron';
+import { registerProxy, attachUtilityProcess } from 'electron-ipc-cat/server';
+
+registerProxy(workspaceService, WorkspaceServiceIPCDescriptor);
+
+const child = utilityProcess.fork('./utilityWorker.js');
+attachUtilityProcess(child); // This utility process can now call all registered services
+
+// Auto-restart on crash (true process isolation — main process survives)
+child.on('exit', (code) => {
+  if (code !== 0) {
+    console.log('Utility process crashed, restarting...');
+    // restart logic here
+  }
+});
+```
+
+### Worker Thread vs UtilityProcess — when to use which?
+
+| | Worker Thread | UtilityProcess |
+|---|---|---|
+| Isolation | Thread-level (shared process memory) | **Process-level (true crash isolation)** |
+| Native module crash | Takes down main process | Only the utility process dies |
+| Startup cost | Lower | Higher (separate process) |
+| MessagePort to renderer | Not supported | **Supported** (direct renderer ↔ utility connection) |
+| Use case | CPU-bound computation, no native crash risk | Long-running tasks with native modules, untrusted code |
+
+Both share the same `ProxyDescriptor` and `createWorkerProxy` API — only the transport and attach function differ.
+
 ## See it working
 
 [Example in TiddlyGit](https://github.com/tiddly-gittly/TiddlyGit-Desktop/blob/0c6b26c0c1113e0c66d6f49f022c5733d4fa85e8/src/preload/common/services.ts#L27-L42)

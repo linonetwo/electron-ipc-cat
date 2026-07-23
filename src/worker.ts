@@ -76,6 +76,48 @@ export function createDefaultWorkerTransport(): WorkerTransport {
   };
 }
 
+/**
+ * Default transport for Electron UtilityProcess child side.
+ *
+ * In a utility process, `process.parentPort` is an EventEmitter whose
+ * `'message'` event delivers a `{ data, ports }` event object — unlike
+ * `worker_threads` where the handler receives the message directly.
+ * This transport unwraps `event.data` so the rest of the proxy logic
+ * can stay transport-agnostic.
+ *
+ * @example
+ * // Inside a utility process entry file
+ * import { createWorkerProxy, createDefaultUtilityProcessTransport } from 'electron-ipc-cat/worker';
+ *
+ * const transport = createDefaultUtilityProcessTransport();
+ * const workspace = createWorkerProxy(WorkspaceServiceIPCDescriptor, Observable, transport);
+ */
+export function createDefaultUtilityProcessTransport(): WorkerTransport {
+  const port = (process as { parentPort?: { postMessage(m: unknown): void; on(e: string, h: (...a: unknown[]) => void): void; removeAllListeners?(e: string): void } }).parentPort;
+  if (!port) {
+    throw new Error('process.parentPort is not available. Must be called in an Electron utility process.');
+  }
+
+  return {
+    postMessage: (message: WorkerCallMessage) => {
+      port.postMessage(message);
+    },
+    on: (event: string, handler: (message: WorkerResponseMessage) => void) => {
+      if (event === 'message') {
+        // Electron utility process wraps the message in a MessageEvent-like
+        // object: { data: <message>, ports: MessagePortMain[] }
+        port.on('message', (e: unknown) => {
+          const eventObj = e as { data: WorkerResponseMessage };
+          handler(eventObj.data);
+        });
+      }
+    },
+    removeAllListeners: (channel: string) => {
+      port.removeAllListeners?.(channel);
+    },
+  };
+}
+
 // Per-transport state to avoid global state pollution
 const transportStates = new WeakMap<WorkerTransport, {
   initialized: boolean;
@@ -320,15 +362,20 @@ function getProperty(
 }
 
 /**
- * Create a typed proxy for worker thread to call main process services
+ * Create a typed proxy for a worker thread or utility process to call main
+ * process services.
+ *
+ * Works in both Node.js `worker_threads` and Electron `UtilityProcess` child
+ * contexts — just pass the appropriate transport (or use the default which
+ * auto-detects based on what's available).
  *
  * @param descriptor Service descriptor defining channel and property types
  * @param ObservableCtor Observable constructor (e.g., from rxjs)
- * @param transport Worker transport (defaults to parentPort)
+ * @param transport Peer transport (defaults to auto-detected parentPort)
  * @returns Typed proxy object
  *
  * @example
- * // In worker thread
+ * // In a worker thread
  * import { createWorkerProxy } from 'electron-ipc-cat/worker';
  * import { Observable } from 'rxjs';
  *
@@ -339,6 +386,17 @@ function getProperty(
  *
  * const workspaces = await workspace.getWorkspacesAsList();
  * workspace.get$(id).subscribe(ws => console.log(ws));
+ *
+ * @example
+ * // In an Electron utility process
+ * import { createWorkerProxy, createDefaultUtilityProcessTransport } from 'electron-ipc-cat/worker';
+ *
+ * const transport = createDefaultUtilityProcessTransport();
+ * const workspace = createWorkerProxy<WorkerProxy<IWorkspaceService>>(
+ *   WorkspaceServiceIPCDescriptor,
+ *   Observable,
+ *   transport
+ * );
  */
 // T is used in the return type to provide proper typing for the proxy
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
