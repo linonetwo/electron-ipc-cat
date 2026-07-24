@@ -1,6 +1,6 @@
 {
   "name": "electron-ipc-cat",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Passing object and type between Electron main process and renderer process simply via preload script.",
   "main": "dist/common.js",
   "type": "module",
@@ -8,6 +8,7 @@
     "./client": "./dist/client.js",
     "./server": "./dist/server.js",
     "./worker": "./dist/worker.js",
+    "./host": "./dist/host.js",
     "./common": "./dist/common.js",
     "./fixContextIsolation": "./dist/fixContextIsolation.js",
     "./utils": "./dist/utils.js"
@@ -22,6 +23,9 @@
       ],
       "worker": [
         "./dist/worker.d.ts"
+      ],
+      "host": [
+        "./dist/host.d.ts"
       ],
       "fixContextIsolation": [
         "./dist/fixContextIsolation.d.ts"
